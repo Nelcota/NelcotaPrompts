@@ -25,7 +25,10 @@ export function extractVariableSpecs(body: string): VariableSpec[] {
 
     if (existing === undefined) {
       specs.set(name, { name, defaultValue });
-    } else if (existing.defaultValue === null && defaultValue !== null) {
+      continue;
+    }
+
+    if (existing.defaultValue === null && defaultValue !== null) {
       existing.defaultValue = defaultValue;
     }
   }

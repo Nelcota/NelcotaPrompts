@@ -13,26 +13,37 @@ type Options<T> = {
   toast?: boolean | "errors";
 };
 
+// Erro sempre aparece (se o toast não estiver desligado); sucesso só com toast: true.
+function showToast(result: ResultLike, show: boolean | "errors") {
+  if (show === false || result.message === "") {
+    return;
+  }
+
+  if (!result.ok) {
+    toast.error(result.message);
+
+    return;
+  }
+
+  if (show === true) {
+    toast.success(result.message);
+  }
+}
+
 // fetcher.data continua lá depois da resposta (e a cada render): aqui cada resultado é
 // tratado uma vez só, quando o fetcher volta a ficar ocioso.
 export function useFetcherResult<T extends ResultLike>(fetcher: FetcherLike<T>, options: Options<T> = {}) {
   const handled = useRef<T | undefined>(undefined);
   const settle = useEffectEvent((result: T) => {
-    const show = options.toast ?? true;
-
-    if (show !== false && result.message !== "") {
-      if (result.ok && show === true) {
-        toast.success(result.message);
-      } else if (!result.ok) {
-        toast.error(result.message);
-      }
-    }
+    showToast(result, options.toast ?? true);
 
     if (result.ok) {
       options.onSuccess?.(result);
-    } else {
-      options.onError?.(result);
+
+      return;
     }
+
+    options.onError?.(result);
   });
 
   useEffect(() => {

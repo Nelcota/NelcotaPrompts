@@ -13,6 +13,17 @@ type Options = {
   linkMissing: boolean;
 };
 
+// set (e não delete + append) mantém o parâmetro onde ele já estava na URL.
+function setOrDeleteParam(params: URLSearchParams, key: string, value: string | null) {
+  if (value === null) {
+    params.delete(key);
+
+    return;
+  }
+
+  params.set(key, value);
+}
+
 // O prompt aberto fica na URL (?p=id): o link pode ser compartilhado. Abrir cria uma
 // entrada no histórico, então o "voltar" do navegador (ou do celular) fecha o prompt.
 export function useOpenPrompt({ prompts, linkedPrompt, linkMissing }: Options) {
@@ -40,13 +51,7 @@ export function useOpenPrompt({ prompts, linkedPrompt, linkMissing }: Options) {
   const hrefWith = useCallback(
     (id: string | null) => {
       const params = new URLSearchParams(base.search);
-
-      if (id === null) {
-        params.delete("p");
-      } else {
-        params.set("p", id);
-      }
-
+      setOrDeleteParam(params, "p", id);
       const search = params.toString();
 
       return `${base.pathname}${search === "" ? "" : `?${search}`}`;

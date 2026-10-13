@@ -5,6 +5,7 @@ import { getClientIp } from "~/shared/server/client-ip.server";
 import { clearAttempts, consumeAttempt, releaseAttempt, retryAfterHeaders, tooManyAttemptsMessage } from "~/shared/server/rate-limit.server";
 import { loginSchema } from "~/features/auth/account-rules";
 import { createUserSession, getOptionalUser } from "~/features/auth/server/session.server";
+import { isInviteRequired } from "~/features/auth/server/invite.server";
 import { verifyLogin } from "~/features/auth/server/users.server";
 import { parseForm, readForm, readText, UNREADABLE_FORM } from "~/shared/server/validation.server";
 import type { Route } from "./+types/login";
@@ -24,7 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     throw redirect("/");
   }
 
-  return null;
+  return { inviteRequired: await isInviteRequired() };
 }
 
 function tooMany(retryAfterSeconds: number, email: string) {
@@ -89,7 +90,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 }
 
-export default function Login({ actionData }: Route.ComponentProps) {
+export default function Login({ loaderData, actionData }: Route.ComponentProps) {
   const navigation = useNavigation();
   const pending = navigation.state === "submitting";
 
@@ -97,7 +98,7 @@ export default function Login({ actionData }: Route.ComponentProps) {
     <AuthShell
       title="Entrar"
       subtitle="Acesse a biblioteca de prompts."
-      footer={{ text: "Recebeu um convite?", linkLabel: "Criar conta", to: "/cadastro" }}
+      footer={{ text: loaderData.inviteRequired ? "Recebeu um convite?" : "Não tem conta?", linkLabel: "Criar conta", to: "/cadastro" }}
     >
       <Form method="post" className="space-y-4">
         <FormError message={actionData?.error} />

@@ -5,7 +5,7 @@ import { ADMIN_TABS, type AdminTab, type AdminTabData } from "~/features/admin/a
 import { dispatchIntent } from "~/shared/server/intent-dispatch.server";
 import { purgeExpiredTrash } from "~/features/prompts/server/prompts.server";
 import { requireAdmin } from "~/features/auth/server/session.server";
-import { getInviteCode } from "~/features/auth/server/invite.server";
+import { getInviteCode, isInviteRequired } from "~/features/auth/server/invite.server";
 import { SEARCH_MAX } from "~/features/prompts/prompt-rules";
 import { readSearch } from "~/shared/server/validation.server";
 import type { Route } from "./+types/admin";
@@ -36,7 +36,7 @@ async function loadTab(tab: AdminTab, url: URL): Promise<AdminTabData> {
       return { tab, search, prompts, trash };
     }
     case "convite":
-      return { tab, invite: await getInviteCode() };
+      return { tab, invite: await getInviteCode(), inviteRequired: await isInviteRequired() };
     case "marca":
       return { tab };
   }

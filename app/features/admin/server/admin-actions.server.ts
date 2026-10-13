@@ -18,7 +18,7 @@ import { readUploadedImage, type UploadedImage } from "~/shared/server/image.ser
 import type { IntentHandler } from "~/shared/server/intent-dispatch.server";
 import { createResetLink } from "~/features/auth/server/password-reset.server";
 import { currentSessionId, destroyUserSessions } from "~/features/auth/server/session.server";
-import { resetInviteCode, setInviteCode } from "~/features/auth/server/invite.server";
+import { resetInviteCode, setInviteCode, setInviteRequired } from "~/features/auth/server/invite.server";
 import type { PublicUser } from "~/features/auth/server/users.server";
 import { parseForm, readText, readUuid } from "~/shared/server/validation.server";
 
@@ -181,6 +181,18 @@ export const ADMIN_HANDLERS: Record<AdminIntent, IntentHandler<Context, Extra>> 
     const count = await emptyTrash();
 
     return reply("trash-empty", 200, count === 0 ? "A lixeira já estava vazia." : `Lixeira esvaziada (${count}).`);
+  },
+
+  async "invite-toggle"(form) {
+    const required = form.get("required") === "true";
+
+    await setInviteRequired(required);
+
+    return reply(
+      "invite-toggle",
+      200,
+      required ? "Convite ligado: o cadastro volta a pedir o código." : "Convite desligado: qualquer pessoa com o link pode criar conta.",
+    );
   },
 
   async "invite-save"(form) {

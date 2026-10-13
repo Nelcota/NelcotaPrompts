@@ -24,7 +24,8 @@ export const registerSchema = z.object({
   name,
   email,
   password: newPassword,
-  invite: requiredText("Código de convite inválido."),
+  // Só é conferido quando o painel exige convite; com o cadastro aberto o campo nem aparece.
+  invite: z.string().trim().default(""),
 });
 
 export const changeNameSchema = z.object({ name });

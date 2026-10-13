@@ -6,7 +6,7 @@ import { NAME_MAX, PASSWORD_MAX, PASSWORD_MIN, registerSchema } from "~/features
 import { getClientIp } from "~/shared/server/client-ip.server";
 import { consumeAttempt, retryAfterHeaders, tooManyAttemptsMessage } from "~/shared/server/rate-limit.server";
 import { createUserSession, getOptionalUser } from "~/features/auth/server/session.server";
-import { getInviteCode } from "~/features/auth/server/invite.server";
+import { getInviteCode, isInviteRequired } from "~/features/auth/server/invite.server";
 import { createUser } from "~/features/auth/server/users.server";
 import { type FieldErrors, parseForm, readForm, readText, UNREADABLE_FORM } from "~/shared/server/validation.server";
 import type { Route } from "./+types/register";
@@ -25,11 +25,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     throw redirect("/");
   }
 
-  return null;
+  return { inviteRequired: await isInviteRequired() };
 }
 
-// O código vem do painel admin (ou, sem ele, da variável INVITE_CODE).
-// Sem código configurado, o cadastro fica fechado (nenhum convite confere).
+// O código vem do painel admin (ou, sem ele, da variável INVITE_CODE). Com o convite
+// ligado e nenhum código configurado, o cadastro fica fechado (nenhum convite confere).
 async function sameInvite(received: string): Promise<boolean> {
   const { code } = await getInviteCode();
 
@@ -44,7 +44,7 @@ async function sameInvite(received: string): Promise<boolean> {
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  // Limita o chute de códigos de convite: cada IP tem poucas tentativas por hora.
+  // Limita o chute de códigos de convite (e contas em massa): poucas tentativas por IP por hora.
   const ipKey = `register-ip:${getClientIp(request, context)}`;
   const limit = await consumeAttempt(ipKey, MAX_ATTEMPTS_PER_IP, WINDOW_MS);
 
@@ -68,10 +68,12 @@ export async function action({ request, context }: Route.ActionArgs) {
   const values = { name: readText(form, "name") ?? "", email: readText(form, "email") ?? "" };
   const errors: FieldErrors = parsed.ok ? {} : { ...parsed.errors };
 
-  // O convite é conferido mesmo com outros erros, para a pessoa ver tudo de uma vez.
+  // O convite (quando o painel exige) é conferido mesmo com outros erros, para a pessoa
+  // ver tudo de uma vez. Se ele foi ligado com a página aberta, o loader recarrega e o
+  // campo aparece junto com o erro.
   const invite = readText(form, "invite");
 
-  if (errors.invite === undefined && (invite === null || !(await sameInvite(invite)))) {
+  if ((await isInviteRequired()) && (invite === null || !(await sameInvite(invite)))) {
     errors.invite = "Código de convite inválido.";
   }
 
@@ -111,7 +113,7 @@ function formMessage(errors: FieldErrors): string | undefined {
   return undefined;
 }
 
-export default function Register({ actionData }: Route.ComponentProps) {
+export default function Register({ loaderData, actionData }: Route.ComponentProps) {
   const navigation = useNavigation();
   const pending = navigation.state === "submitting";
   const errors: FieldErrors = actionData?.errors ?? {};
@@ -119,7 +121,7 @@ export default function Register({ actionData }: Route.ComponentProps) {
   return (
     <AuthShell
       title="Criar conta"
-      subtitle="Requer código de convite."
+      subtitle={loaderData.inviteRequired ? "Requer código de convite." : "Leva menos de um minuto."}
       footer={{ text: "Já tem conta?", linkLabel: "Entrar", to: "/login" }}
     >
       <Form method="post" className="space-y-4">
@@ -153,13 +155,9 @@ export default function Register({ actionData }: Route.ComponentProps) {
           maxLength={PASSWORD_MAX}
           error={errors.password}
         />
-        <Field
-          label="Código de convite"
-          name="invite"
-          autoComplete="off"
-          placeholder="O código que você recebeu"
-          error={errors.invite}
-        />
+        {loaderData.inviteRequired ? (
+          <Field label="Código de convite" name="invite" autoComplete="off" placeholder="O código que você recebeu" error={errors.invite} />
+        ) : null}
         <SubmitButton pending={pending} label="Criar conta" pendingLabel="Criando…" />
       </Form>
     </AuthShell>

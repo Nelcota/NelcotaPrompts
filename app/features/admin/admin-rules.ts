@@ -21,6 +21,7 @@ export const ADMIN_INTENTS = [
   "prompt-restore",
   "prompt-purge",
   "trash-empty",
+  "invite-toggle",
   "invite-save",
   "invite-random",
   "invite-reset",
@@ -82,5 +83,5 @@ export type AdminTabData =
   | { tab: "visao"; stats: AdminStats }
   | { tab: "usuarios"; users: AdminUser[] }
   | { tab: "prompts"; search: string | null; prompts: AdminPrompt[]; trash: AdminPrompt[] }
-  | { tab: "convite"; invite: InviteCode }
+  | { tab: "convite"; invite: InviteCode; inviteRequired: boolean }
   | { tab: "marca" };

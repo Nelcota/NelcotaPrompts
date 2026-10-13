@@ -4,8 +4,25 @@ import type { InviteCode } from "~/features/auth/types";
 import { getDb } from "~/shared/server/db.server";
 import { siteSettings } from "~/shared/server/db/schema";
 
-// Código de convite (tabela site_settings), editável pelo painel admin.
+// Código de convite e se ele é exigido (tabela site_settings), editáveis pelo painel admin.
 const INVITE_KEY = "invite_code";
+const INVITE_REQUIRED_KEY = "invite_required";
+
+// Sem linha = cadastro aberto (o convite só vale depois que o admin liga no painel).
+export async function isInviteRequired(): Promise<boolean> {
+  const [row] = await getDb().select({ value: siteSettings.value }).from(siteSettings).where(eq(siteSettings.key, INVITE_REQUIRED_KEY));
+
+  return row?.value === "true";
+}
+
+export async function setInviteRequired(required: boolean) {
+  const value = String(required);
+
+  await getDb()
+    .insert(siteSettings)
+    .values({ key: INVITE_REQUIRED_KEY, value })
+    .onConflictDoUpdate({ target: siteSettings.key, set: { value, updatedAt: new Date() } });
+}
 
 // O código salvo pelo painel vale sobre a variável INVITE_CODE (que vira só o padrão).
 export async function getInviteCode(): Promise<InviteCode> {

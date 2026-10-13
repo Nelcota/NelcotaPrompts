@@ -4,7 +4,7 @@
 
 # Nelcota Prompts
 
-**A private, invite-only prompt library for developers.**
+**A private prompt library for developers.**
 Write a prompt once, share it with your team, copy it with the blanks already filled in.
 
 [![Bun](https://img.shields.io/badge/Bun-1.4-000?logo=bun&logoColor=fff)](https://bun.sh)
@@ -31,7 +31,7 @@ Write a prompt once, share it with your team, copy it with the blanks already fi
 | **Favorites & most copied** | Star prompts, sort by copy count, filter by author. |
 | **Trash with undo** | Deleting is reversible for 7 days. |
 | **Profile photos** | In-browser editor: crop, zoom, rotate, flip, brightness, contrast, saturation, temperature and presets. |
-| **Admin panel** | Users (reset links, admin role, sessions, block, delete), moderation and trash, invite code, logo. |
+| **Admin panel** | Users (reset links, admin role, sessions, block, delete), moderation and trash, invite toggle and code, logo. |
 | **Keyboard first** | <kbd>⌘K</kbd> palette · <kbd>/</kbd> search · <kbd>N</kbd> new prompt · <kbd>C</kbd> copy · <kbd>Enter</kbd> open. |
 
 ## Stack
@@ -88,7 +88,7 @@ bun run dev           # http://localhost:5173
 |---|:---:|---|
 | `DATABASE_URL` | ✓ | `postgres://user:password@host:5432/database` |
 | `SESSION_SECRET` | ✓ | Long random string that signs the session cookie |
-| `INVITE_CODE` |  | Default sign-up code. The admin panel can set or rotate it at runtime; with neither, sign-up is closed |
+| `INVITE_CODE` |  | Default sign-up code, used when the admin panel requires an invite. The panel can also set or rotate it at runtime |
 | `PORT` |  | Port for `server.ts` (default `3000`) |
 | `APP_URL` |  | Public address (`https://prompts.example.com`), shown in the startup log and used by `reset-link`. On Coolify it defaults to the app's domain |
 | `TRUSTED_PROXY` |  | Set to `cloudflare` when Cloudflare proxies the app, so the client IP comes from `CF-Connecting-IP` |
@@ -139,7 +139,7 @@ The session cookie is `Secure` in production, so sign-in persists only over HTTP
 
 ## Security
 
-- **Invite-only sign-up**; the code can be rotated from the admin panel without a redeploy.
+- **Optional invite code**: sign-up is open by default; one switch in the admin panel requires a code (rotatable without a redeploy).
 - **Server-side sessions** in Postgres: signing out, blocking a user or changing a password revokes them immediately.
 - **CSRF**: form submissions are accepted only from the same origin (`Origin` / `Sec-Fetch-Site`).
 - **CSP** with a per-request nonce, HSTS, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`.

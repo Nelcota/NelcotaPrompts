@@ -12,6 +12,7 @@ import {
   ScrollRestoration,
   type ShouldRevalidateFunctionArgs,
   useNavigation,
+  useRouteLoaderData,
 } from "react-router";
 import { Toaster } from "sonner";
 
@@ -24,6 +25,7 @@ import faviconUrl from "~/assets/mascot/favicon.png";
 import { getTheme } from "~/features/theme/server/theme.server";
 import { getLogoUrl } from "~/features/brand/server/brand.server";
 import { useTheme } from "~/features/theme/theme";
+import { publicUrl } from "~/shared/lib/public-url";
 import type { Route } from "./+types/root";
 import "./app.css";
 
@@ -35,7 +37,38 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {
-  return { theme: await getTheme(request), logoUrl: await getLogoUrl() };
+  return { theme: await getTheme(request), logoUrl: await getLogoUrl(), siteUrl: publicUrl() ?? new URL(request.url).origin };
+}
+
+const SITE_NAME = "Nelcota Prompts";
+const SITE_DESCRIPTION = "A biblioteca de prompts da turma: escreva uma vez, compartilhe e copie com as variáveis já preenchidas.";
+
+// Cartão de link (WhatsApp, Discord, Slack, X, LinkedIn). O app é fechado: quem não está
+// logado cai no login, então todo link mostra o mesmo cartão, sem conteúdo de prompt.
+// As redes exigem URLs absolutas para a imagem.
+function ShareTags({ siteUrl }: { siteUrl: string }) {
+  const image = `${siteUrl}/og.jpg`;
+
+  return (
+    <>
+      <meta name="description" content={SITE_DESCRIPTION} />
+      <meta property="og:type" content="website" />
+      <meta property="og:site_name" content={SITE_NAME} />
+      <meta property="og:locale" content="pt_BR" />
+      <meta property="og:title" content={SITE_NAME} />
+      <meta property="og:description" content={SITE_DESCRIPTION} />
+      <meta property="og:url" content={`${siteUrl}/`} />
+      <meta property="og:image" content={image} />
+      <meta property="og:image:type" content="image/jpeg" />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      <meta property="og:image:alt" content="Nelcota Prompts: os prompts que a turma usa de verdade" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={SITE_NAME} />
+      <meta name="twitter:description" content={SITE_DESCRIPTION} />
+      <meta name="twitter:image" content={image} />
+    </>
+  );
 }
 
 // Tema e logo só mudam por ação (POST): navegar na mesma página trocando só a URL (abrir
@@ -50,6 +83,8 @@ export function shouldRevalidate({ currentUrl, nextUrl, formMethod, defaultShoul
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
+  // Sem dados (erro antes do loader raiz): a página sai sem o cartão de link.
+  const siteUrl = useRouteLoaderData<typeof loader>("root")?.siteUrl;
 
   return (
     <html lang="pt-BR" className={theme === "dark" ? "dark" : ""}>
@@ -57,6 +92,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content={theme} />
+        <meta name="theme-color" content={theme === "dark" ? "#050505" : "#f3f0ea"} />
+        {siteUrl === undefined ? null : <ShareTags siteUrl={siteUrl} />}
         <link rel="icon" type="image/png" href={faviconUrl} />
         <link rel="apple-touch-icon" href={appleTouchIconUrl} />
         <Meta />

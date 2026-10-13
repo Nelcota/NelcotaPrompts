@@ -90,6 +90,7 @@ bun run dev           # http://localhost:5173
 | `SESSION_SECRET` | ✓ | Long random string that signs the session cookie |
 | `INVITE_CODE` |  | Default sign-up code. The admin panel can set or rotate it at runtime; with neither, sign-up is closed |
 | `PORT` |  | Port for `server.ts` (default `3000`) |
+| `APP_URL` |  | Public address (`https://prompts.example.com`), shown in the startup log and used by `reset-link`. On Coolify it defaults to the app's domain |
 | `TRUSTED_PROXY` |  | Set to `cloudflare` when Cloudflare proxies the app, so the client IP comes from `CF-Connecting-IP` |
 
 Generate a secret with:
@@ -130,7 +131,7 @@ The `Dockerfile` builds a Bun-only image (no Node). On start it runs pending mig
 
 1. Create a **PostgreSQL** resource and copy its internal connection URL.
 2. Create an **Application** from this repository with the **Dockerfile** build pack.
-3. Set `DATABASE_URL`, `SESSION_SECRET`, `INVITE_CODE` (optional) and `PORT=3000`; expose port `3000`.
+3. Set `DATABASE_URL`, `SESSION_SECRET`, `INVITE_CODE` (optional), `APP_URL` and `PORT=3000`; expose port `3000`.
 4. Health check: path `/health`, port `3000`.
 5. Deploy, then open the container terminal once and run `bun run make-admin you@example.com`.
 

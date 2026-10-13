@@ -49,6 +49,7 @@ Build de produção local: `bun run build && bun run start`. Em produção o coo
 | `SESSION_SECRET` | Segredo longo e aleatório que assina o cookie de sessão |
 | `INVITE_CODE` | Código exigido no cadastro (padrão; o painel admin pode trocar sem redeploy) |
 | `PORT` | Porta HTTP do `server.ts` (padrão 3000) |
+| `APP_URL` | Endereço público (`https://prompts.seudominio.com`), mostrado no log de inicialização e usado pelo `reset-link`. No Coolify, o padrão é o domínio do app |
 | `TRUSTED_PROXY` | Opcional. `cloudflare` se houver Cloudflare (proxy ativo) na frente do Coolify |
 
 ## Organização do código
@@ -88,7 +89,7 @@ Actions com vários `intent` passam por `dispatchIntent` (`shared/server/intent-
 
 1. Crie um recurso **PostgreSQL** no Coolify e copie a URL interna de conexão.
 2. Crie uma **Application** apontando para o repositório, com build pack **Dockerfile**.
-3. Defina `DATABASE_URL`, `SESSION_SECRET`, `INVITE_CODE` e `PORT=3000`; em *Ports Exposes* use `3000`.
+3. Defina `DATABASE_URL`, `SESSION_SECRET`, `INVITE_CODE`, `APP_URL` e `PORT=3000`; em *Ports Exposes* use `3000`.
 4. Healthcheck: caminho `/health`, porta `3000`. A imagem inclui `curl` para o healthcheck do Coolify funcionar (o Dockerfile também declara um `HEALTHCHECK` próprio, feito com Bun).
 5. Faça o deploy. O container roda `bun run migrate && bun run start`, então as migrations são aplicadas a cada subida.
 

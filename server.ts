@@ -12,6 +12,8 @@ import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import { createRequestHandler, type ServerBuild } from "react-router";
 
+import { publicUrl } from "./app/shared/lib/public-url";
+
 const SERVER_BUILD = join(import.meta.dir, "build", "server", "index.js");
 const DEFAULT_PORT = 3000;
 // Teto do corpo das requisições: o maior caso é a logo (até 1 MB); a foto de perfil, 512 KB.
@@ -115,7 +117,10 @@ app.onError((error, c) => {
 
 const server = Bun.serve({ port: readPort(), maxRequestBodySize: MAX_BODY_BYTES, fetch: app.fetch });
 
-console.log(`Nelcota Prompts rodando em ${server.url}`);
+// Atrás do proxy, o endereço que importa é o público; a porta interna fica entre parênteses.
+const address = publicUrl();
+
+console.log(address === null ? `Nelcota Prompts rodando em ${server.url}` : `Nelcota Prompts no ar em ${address} (porta ${server.port})`);
 
 // No container o Bun é o PID 1, e o Linux ignora SIGTERM no PID 1 sem um handler
 // explícito: sem isto o Coolify esperaria o timeout e mataria o processo à força.

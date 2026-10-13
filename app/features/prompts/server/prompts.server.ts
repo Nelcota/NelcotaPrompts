@@ -49,17 +49,20 @@ function searchCondition(text: string): { match: SQL; rank: SQL<number> } {
   return { match, rank: sql<number>`ts_rank(${prompts.search}, ${query}) + ${similarity}` };
 }
 
+// Critério que vem antes da data na ordenação: mais copiados, relevância da busca ou nenhum.
+function leadingOrder(sort: PromptSort, search: { rank: SQL<number> } | null): SQL[] {
+  if (sort === "popular") {
+    return [desc(prompts.copyCount)];
+  }
+
+  return search === null ? [] : [desc(search.rank)];
+}
+
 // A única consulta de leitura de prompts (lista e prompt avulso), com o que o card mostra:
 // trecho do corpo, autor, foto e se quem vê favoritou. id restringe a um prompt só.
 async function queryPrompts(viewerId: string, filters: PromptFilters, limit: number, id: string | null = null) {
   const search = filters.search === null ? null : searchCondition(filters.search);
-  const order: SQL[] = [];
-
-  if (filters.sort === "popular") {
-    order.push(desc(prompts.copyCount));
-  } else if (search !== null) {
-    order.push(desc(search.rank));
-  }
+  const order = leadingOrder(filters.sort, search);
 
   const rows = await getDb()
     .select({

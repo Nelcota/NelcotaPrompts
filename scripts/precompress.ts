@@ -15,7 +15,10 @@ async function* files(dir: string): AsyncGenerator<string> {
 
     if (entry.isDirectory()) {
       yield* files(path);
-    } else if (COMPRESSIBLE.test(entry.name)) {
+      continue;
+    }
+
+    if (COMPRESSIBLE.test(entry.name)) {
       yield path;
     }
   }

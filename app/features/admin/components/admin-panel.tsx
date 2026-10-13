@@ -1,0 +1,79 @@
+import { ArrowLeft } from "lucide-react";
+import { Link } from "react-router";
+
+import type { AdminTab, AdminTabData } from "~/features/admin/admin-rules";
+import type { SessionUser } from "~/features/auth/types";
+import { Avatar } from "~/shared/ui/avatar";
+import { BrandWordmark } from "~/features/brand/components/brand-logo";
+import { BrandTab } from "./brand-tab";
+import { InviteTab } from "./invite-tab";
+import { OverviewTab } from "./overview-tab";
+import { PromptsTab } from "./prompts-tab";
+import { UsersTab } from "./users-tab";
+
+const TAB_LABELS: Record<AdminTab, string> = {
+  visao: "Visão geral",
+  usuarios: "Usuários",
+  prompts: "Prompts",
+  convite: "Convite",
+  marca: "Marca",
+};
+
+function TabContent({ data, adminId }: { data: AdminTabData; adminId: string }) {
+  switch (data.tab) {
+    case "visao":
+      return <OverviewTab stats={data.stats} />;
+    case "usuarios":
+      return <UsersTab users={data.users} adminId={adminId} />;
+    case "prompts":
+      return <PromptsTab prompts={data.prompts} trash={data.trash} search={data.search} />;
+    case "convite":
+      return <InviteTab invite={data.invite} />;
+    case "marca":
+      return <BrandTab />;
+  }
+}
+
+// Página do painel: cabeçalho, abas (links ?aba=) e o conteúdo da aba atual.
+export function AdminPanel({ admin, data }: { admin: SessionUser; data: AdminTabData }) {
+  return (
+    <div className="min-h-dvh">
+      <header className="border-b border-line">
+        <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4 sm:px-6">
+          <Link to="/" className="font-display inline-flex shrink-0 items-center gap-2.5 text-2xl font-light tracking-tight whitespace-nowrap">
+            <BrandWordmark logoClassName="h-8" hideTextOnMobile />
+          </Link>
+          <span className="rounded-md border border-line px-1.5 py-0.5 font-mono text-xs text-muted">admin</span>
+          <Link
+            to="/"
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-ink/5 hover:text-ink"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Voltar ao mural
+          </Link>
+          <Avatar name={admin.name} url={admin.avatarUrl} sizeClassName="size-8" fallbackClassName="bg-ink text-sm text-canvas" />
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+        <h1 className="font-display text-4xl font-light tracking-tight">Painel admin</h1>
+        <nav aria-label="Seções do painel" className="no-scrollbar mt-5 flex gap-1 overflow-x-auto border-b border-line">
+          {(Object.keys(TAB_LABELS) as AdminTab[]).map((key) => (
+            <Link
+              key={key}
+              to={key === "visao" ? "/admin" : `/admin?aba=${key}`}
+              aria-current={key === data.tab ? "page" : undefined}
+              className="-mb-px shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition hover:text-ink aria-[current=page]:border-ink aria-[current=page]:text-ink"
+            >
+              {TAB_LABELS[key]}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="mt-6">
+          <TabContent data={data} adminId={admin.id} />
+        </div>
+      </main>
+    </div>
+  );
+}

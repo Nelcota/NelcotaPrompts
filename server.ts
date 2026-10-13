@@ -1,0 +1,137 @@
+// Servidor de produção: Hono sobre Bun.serve. Arquivos do build, compressão, CSRF,
+// headers de segurança e limite de corpo são middlewares do Hono; o resto vai para o
+// React Router.
+import { join } from "node:path";
+
+import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { getConnInfo, serveStatic } from "hono/bun";
+import { HTTPException } from "hono/http-exception";
+import { compress } from "hono/compress";
+import { csrf } from "hono/csrf";
+import { secureHeaders } from "hono/secure-headers";
+import { createRequestHandler, type ServerBuild } from "react-router";
+
+const SERVER_BUILD = join(import.meta.dir, "build", "server", "index.js");
+const DEFAULT_PORT = 3000;
+// Teto do corpo das requisições: o maior caso é a logo (até 1 MB); a foto de perfil, 512 KB.
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
+const ONE_YEAR = 60 * 60 * 24 * 365;
+
+function readPort(): number {
+  const raw = process.env.PORT?.trim();
+
+  if (raw === undefined || raw === "") {
+    return DEFAULT_PORT;
+  }
+
+  const port = Number(raw);
+
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    console.warn(`PORT inválida (${raw}), usando ${DEFAULT_PORT}.`);
+
+    return DEFAULT_PORT;
+  }
+
+  return port;
+}
+
+function isServerBuild(value: unknown): value is ServerBuild {
+  return typeof value === "object" && value !== null && "routes" in value && "entry" in value && "assets" in value;
+}
+
+const serverModule: unknown = await import(SERVER_BUILD);
+
+if (!isServerBuild(serverModule)) {
+  console.error(`Build inválido em ${SERVER_BUILD}. Rode "bun run build" antes de "bun run start".`);
+  process.exit(1);
+}
+
+const handleRequest = createRequestHandler(serverModule, "production");
+const app = new Hono();
+
+// O CSP (com nonce) vem do entry.server do React Router; aqui ficam os demais headers.
+app.use(
+  secureHeaders({
+    contentSecurityPolicy: undefined,
+    xFrameOptions: "DENY",
+    referrerPolicy: "strict-origin-when-cross-origin",
+    // Sem includeSubDomains: não força HTTPS em outros subdomínios do mesmo domínio.
+    strictTransportSecurity: "max-age=31536000",
+    permissionsPolicy: { camera: [], microphone: [], geolocation: [] },
+  }),
+);
+
+// Arquivos do build. Os de /assets/ têm hash no nome (nunca mudam): cache de um ano. As
+// versões .br/.gz são geradas no build (scripts/precompress.ts).
+app.use(
+  "*",
+  serveStatic({
+    // Relativo ao server.ts (não ao diretório de onde o processo foi iniciado).
+    root: join(import.meta.dir, "build", "client"),
+    precompressed: true,
+    onFound: (path, c) => {
+      c.header("Cache-Control", path.includes("/assets/") ? `public, max-age=${ONE_YEAR}, immutable` : "public, max-age=3600");
+    },
+  }),
+);
+
+// CSRF (inclusive "login CSRF"): envios de formulário só do próprio site. A Origin é
+// comparada com o Host, e não com a URL interna: o proxy termina o HTTPS antes daqui.
+app.use(
+  csrf({
+    secFetchSite: "same-origin",
+    origin: (origin, c) => {
+      try {
+        return new URL(origin).host === c.req.header("host");
+      } catch {
+        return false;
+      }
+    },
+  }),
+);
+
+app.use(bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.text("Arquivo grande demais.", 413) }));
+
+// HTML e dados (.data) saem em streaming; o compress mantém o streaming.
+app.use(compress());
+
+app.all("*", (c) => {
+  const clientIp = getConnInfo(c).remote.address;
+
+  return handleRequest(c.req.raw, clientIp === undefined ? {} : { clientIp });
+});
+
+// Recusas dos middlewares (CSRF 403, corpo grande demais 413) chegam como HTTPException.
+app.onError((error, c) => {
+  if (error instanceof HTTPException) {
+    return error.getResponse();
+  }
+
+  console.error(error);
+
+  return c.text("Erro interno do servidor.", 500);
+});
+
+const server = Bun.serve({ port: readPort(), maxRequestBodySize: MAX_BODY_BYTES, fetch: app.fetch });
+
+console.log(`Nelcota Prompts rodando em ${server.url}`);
+
+// No container o Bun é o PID 1, e o Linux ignora SIGTERM no PID 1 sem um handler
+// explícito: sem isto o Coolify esperaria o timeout e mataria o processo à força.
+let shuttingDown = false;
+
+async function shutdown(signal: string) {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+  console.log(`${signal} recebido, encerrando…`);
+  await server.stop();
+  await globalThis.__nelcotaSql?.close({ timeout: 5 });
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

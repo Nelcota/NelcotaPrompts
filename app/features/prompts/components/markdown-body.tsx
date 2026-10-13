@@ -1,8 +1,19 @@
 import type { Element, ElementContent, Root } from "hast";
+import bash from "highlight.js/lib/languages/bash";
+import css from "highlight.js/lib/languages/css";
+import diff from "highlight.js/lib/languages/diff";
+import javascript from "highlight.js/lib/languages/javascript";
+import json from "highlight.js/lib/languages/json";
+import markdown from "highlight.js/lib/languages/markdown";
+import python from "highlight.js/lib/languages/python";
+import sql from "highlight.js/lib/languages/sql";
+import typescript from "highlight.js/lib/languages/typescript";
+import xml from "highlight.js/lib/languages/xml";
+import yaml from "highlight.js/lib/languages/yaml";
+import { createLowlight } from "lowlight";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
-import rehypeHighlight from "rehype-highlight";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
@@ -46,6 +57,34 @@ function protectVariables(text: string): { source: string; variables: string[] }
     .join("");
 
   return { source, variables };
+}
+
+// Realce de sintaxe (lowlight) só com as linguagens mais comuns em prompts: o pacote
+// "common" do highlight.js somava ~50 kB (gzip) à página inicial. Os apelidos (ts, js, sh,
+// html…) vêm com cada linguagem; bloco sem linguagem ou com uma desconhecida fica sem cor.
+// Roda antes de rehypeVariables: os marcadores das variáveis passam intactos pelo realce.
+const lowlight = createLowlight({ bash, css, diff, javascript, json, markdown, python, sql, typescript, xml, yaml });
+
+function rehypeHighlight() {
+  const visit = (node: Root | Element) => {
+    for (const child of node.children) {
+      if (child.type !== "element") {
+        continue;
+      }
+
+      const language = child.tagName === "pre" ? languageOf(child) : null;
+      const code = child.children[0];
+
+      if (language === null || code?.type !== "element" || !lowlight.registered(language)) {
+        visit(child);
+        continue;
+      }
+
+      code.children = lowlight.highlight(language, textOf(code)).children.filter((part): part is ElementContent => part.type !== "doctype");
+    }
+  };
+
+  return (tree: Root) => visit(tree);
 }
 
 function rehypeVariables(variables: string[], markClass: string) {

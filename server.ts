@@ -98,10 +98,28 @@ app.use(bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.text("Arquivo gra
 // HTML e dados (.data) saem em streaming; o compress mantém o streaming.
 app.use(compress());
 
+// O HTTPS termina no proxy (Traefik do Coolify, Cloudflare): aqui a requisição chega como
+// http://. O React Router compara a origem inteira (com o protocolo) do cabeçalho Origin
+// com request.url e recusaria todo formulário com 400; por isso a URL volta a ser https
+// quando o proxy avisa. Forjar o cabeçalho só troca o protocolo da própria requisição.
+function withForwardedProto(request: Request, forwardedProto: string | undefined): Request {
+  const proto = forwardedProto?.split(",")[0]?.trim().toLowerCase();
+  const url = new URL(request.url);
+
+  if (proto !== "https" || url.protocol === "https:") {
+    return request;
+  }
+
+  url.protocol = "https:";
+
+  return new Request(url, request);
+}
+
 app.all("*", (c) => {
   const clientIp = getConnInfo(c).remote.address;
+  const request = withForwardedProto(c.req.raw, c.req.header("x-forwarded-proto"));
 
-  return handleRequest(c.req.raw, clientIp === undefined ? {} : { clientIp });
+  return handleRequest(request, clientIp === undefined ? {} : { clientIp });
 });
 
 // Recusas dos middlewares (CSRF 403, corpo grande demais 413) chegam como HTTPException.

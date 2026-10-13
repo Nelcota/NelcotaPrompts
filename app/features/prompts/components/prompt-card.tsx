@@ -6,6 +6,7 @@ import type { Prompt } from "~/features/prompts/types";
 import { Avatar } from "~/shared/ui/avatar";
 import { CopyButton } from "./copy-button";
 import { FavoriteButton } from "./favorite-button";
+import { InlineCodeText, MarkdownPreview } from "./markdown-body";
 import { useHomeQuery } from "./prompt-actions";
 import { liteBackground, useArtImage } from "~/shared/ui/prompt-art";
 import { cn } from "~/shared/ui/cn";
@@ -79,12 +80,13 @@ export const PromptCard = memo(function PromptCard({ prompt, active, lite = fals
             onClick={() => onOpen(prompt)}
             className={cn("rounded-xl text-balance after:absolute after:inset-0 after:cursor-pointer", FOCUS_RING)}
           >
-            {prompt.title}
+            <InlineCodeText text={prompt.title} codeClassName="rounded-lg bg-white/15 px-1.5 font-mono text-[0.8em]" />
           </button>
         </h3>
-        <p className="mt-3 line-clamp-3 font-mono text-[13px] leading-relaxed text-white/70 transition-opacity group-data-[active=false]:opacity-0">
-          {prompt.excerpt}
-        </p>
+        <MarkdownPreview
+          text={prompt.excerpt}
+          className="mt-3 line-clamp-3 font-mono text-[13px] leading-relaxed text-white/70 transition-opacity group-data-[active=false]:opacity-0"
+        />
       </div>
       <Link
         to={filterHref(query, { authorId: prompt.authorId })}

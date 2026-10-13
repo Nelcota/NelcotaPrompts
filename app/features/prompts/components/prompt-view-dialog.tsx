@@ -5,6 +5,7 @@ import type { Prompt } from "~/features/prompts/types";
 import { Dialog } from "~/shared/ui/dialog";
 import { PromptArt } from "~/shared/ui/prompt-art";
 import { PromptHistory } from "./prompt-history";
+import { InlineCodeText } from "./markdown-body";
 import { PromptBodyViewer } from "~/features/prompts/components/prompt-view/prompt-body-viewer";
 import { PromptMetaLine } from "~/features/prompts/components/prompt-view/prompt-meta-line";
 import { PromptToolbar } from "~/features/prompts/components/prompt-view/prompt-toolbar";
@@ -30,7 +31,9 @@ export function PromptViewDialog({ prompt, isOwner, onClose, onEdit }: PromptVie
       <div className="relative -mx-6 -mt-6 mb-6 h-28 overflow-hidden sm:-mx-8 sm:-mt-8">
         <PromptArt seed={prompt.id} animated />
       </div>
-      <h2 className="font-display pr-8 text-3xl leading-tight font-light tracking-tight">{prompt.title}</h2>
+      <h2 className="font-display pr-8 text-3xl leading-tight font-light tracking-tight">
+        <InlineCodeText text={prompt.title} codeClassName="rounded-lg bg-ink/10 px-1.5 font-mono text-[0.8em]" />
+      </h2>
       <PromptMetaLine prompt={prompt} />
 
       {showingHistory && body !== null ? (

@@ -26,6 +26,8 @@ type FieldProps = {
   inputClassName?: string;
   // Conteúdo à direita do rótulo (ex.: link "Esqueci a senha").
   aside?: ReactNode;
+  // Mostrado no lugar do campo (ex.: pré-visualização), que continua no formulário, oculto.
+  replacement?: ReactNode;
 };
 
 // Campo com rótulo, dica e erro ligados ao input (aria-describedby/aria-invalid). Senha
@@ -49,6 +51,7 @@ export function Field({
   background = "canvas",
   inputClassName = "",
   aside,
+  replacement,
 }: FieldProps) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -81,7 +84,7 @@ export function Field({
       </div>
       <div className="relative mt-1.5">
         {multiline ? (
-          <textarea {...shared} rows={rows} className={cn(className, "resize-y")} />
+          <textarea {...shared} rows={rows} hidden={replacement !== undefined} className={cn(className, "resize-y")} />
         ) : (
           <input {...shared} type={isPassword && visible ? "text" : type} autoComplete={autoComplete} className={className} />
         )}
@@ -96,6 +99,7 @@ export function Field({
             {visible ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
           </button>
         ) : null}
+        {replacement}
       </div>
       {hint === undefined ? null : (
         <span id={hintId} className="mt-1.5 block text-sm text-muted">

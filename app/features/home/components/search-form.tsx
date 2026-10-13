@@ -57,7 +57,7 @@ export function SearchForm({ query, className, onOpenPalette }: SearchFormProps)
     queryRef.current = query;
   }, [query]);
 
-  // Se a busca mudou por fora (ex.: "Limpar filtros"), reflete no campo — mas nunca
+  // Se a busca mudou por fora (ex.: "Limpar filtros"), reflete no campo, mas nunca
   // enquanto a pessoa está digitando nele.
   useEffect(() => {
     if (document.activeElement === inputRef.current) {

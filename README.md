@@ -38,10 +38,10 @@ Write a prompt once, share it with your team, copy it with the blanks already fi
 
 | Layer | Tools |
 |---|---|
-| Runtime | [Bun](https://bun.sh) — runtime, package manager, `Bun.SQL`, `Bun.password` |
+| Runtime | [Bun](https://bun.sh): runtime, package manager, `Bun.SQL`, `Bun.password` |
 | App | [React Router 7](https://reactrouter.com) (framework mode) · React 19 |
 | Data | PostgreSQL · [Drizzle ORM](https://orm.drizzle.team) · plain SQL migrations |
-| Validation | [Zod](https://zod.dev) — the same schemas run in the browser and on the server |
+| Validation | [Zod](https://zod.dev): the same schemas run in the browser and on the server |
 | UI | [Tailwind CSS 4](https://tailwindcss.com) · [cmdk](https://cmdk.paco.me) · [Radix](https://www.radix-ui.com) · [Embla](https://www.embla-carousel.com) · [Sonner](https://sonner.emilkowal.ski) · [Lucide](https://lucide.dev) |
 | Content | [react-markdown](https://github.com/remarkjs/react-markdown) + GFM · [jsdiff](https://github.com/kpdecker/jsdiff) · [react-easy-crop](https://github.com/ValentinH/react-easy-crop) |
 | Server | [Hono](https://hono.dev) on `Bun.serve` · [sharp](https://sharp.pixelplumbing.com) · [rate-limiter-flexible](https://github.com/animir/node-rate-limiter-flexible) |
@@ -78,7 +78,7 @@ bun run dev           # http://localhost:5173
 | `bun run start` | Production server (`server.ts`) |
 | `bun run typecheck` | Route type generation + `tsc` |
 | `bun run migrate` | Apply pending `migrations/NNN_*.sql` (advisory-locked, safe with parallel boots) |
-| `bun run seed` | Optional demo account and prompts — never run it in production |
+| `bun run seed` | Optional demo account and prompts. Never run it in production |
 | `bun run make-admin <email> [--remover]` | Grant (or revoke) access to `/admin` |
 | `bun run reset-link <email> [url]` | One-time password reset link, valid for 1 hour |
 
@@ -120,7 +120,7 @@ app/
     └── ui/            dialog, fields, buttons, avatar
 ```
 
-Dependencies only point one way — `shared` → `profile` · `brand` · `theme` → `auth` → `prompts` → `home` · `admin` → `routes` — and `shared/` never imports a feature.
+Dependencies only point one way (`shared` → `profile` · `brand` · `theme` → `auth` → `prompts` → `home` · `admin` → `routes`), and `shared/` never imports a feature.
 
 ## Deployment
 
@@ -139,7 +139,7 @@ The session cookie is `Secure` in production, so sign-in persists only over HTTP
 ## Security
 
 - **Invite-only sign-up**; the code can be rotated from the admin panel without a redeploy.
-- **Server-side sessions** in Postgres — signing out, blocking a user or changing a password revokes them immediately.
+- **Server-side sessions** in Postgres: signing out, blocking a user or changing a password revokes them immediately.
 - **CSRF**: form submissions are accepted only from the same origin (`Origin` / `Sec-Fetch-Site`).
 - **CSP** with a per-request nonce, HSTS, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`.
 - **Rate limits** on sign-in, sign-up, password reset, password change and uploads. Behind Cloudflare, `CF-Connecting-IP` is trusted only when the connection really comes from Cloudflare's published ranges.
@@ -150,9 +150,9 @@ The session cookie is `Secure` in production, so sign-in persists only over HTTP
 ## How it works
 
 - **Lean list.** The list sends only the first 280 characters of each prompt; the full body is fetched when you open or copy it.
-- **Coverflow without per-frame effects.** Card art is generated from the prompt id as SVG, rasterized once in the browser — no CSS radius, shadow or blur inside the 3D transform, which keeps scrolling smooth in Firefox.
+- **Coverflow without per-frame effects.** Card art is generated from the prompt id as SVG, rasterized once in the browser. No CSS radius, shadow or blur inside the 3D transform, which keeps scrolling smooth in Firefox.
 - **One query for every list.** The library, the palette and direct links share a single typed query; search adds a weighted `tsvector` (title › tags › body) plus trigram similarity.
-- **Optimistic, but honest.** Favorites flip instantly; deletes go to the trash and the toast offers *Undo*. Authors can only restore what they deleted themselves — admin moderation sticks.
+- **Optimistic, but honest.** Favorites flip instantly; deletes go to the trash and the toast offers *Undo*. Authors can only restore what they deleted themselves, so admin moderation sticks.
 - **URL as state.** Filters, view and the open prompt live in the URL: links are shareable and the Back button closes an open prompt.
 - **Single instance by design.** Rate limits and the logo cache live in memory. To run several replicas, swap the limiter store for Postgres or Redis in `shared/server/rate-limit.server.ts`.
 

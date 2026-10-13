@@ -95,7 +95,7 @@ function AdminNotice() {
   return (
     <div className="space-y-4 rounded-3xl border border-line bg-surface/70 p-5 text-base">
       <p>Peça a um admin: ele gera um link de uso único no painel (Usuários) ou no servidor com</p>
-      <pre className="overflow-x-auto rounded-2xl bg-canvas px-4 py-3 font-mono text-sm">bun run reset-link seu@email.com</pre>
+      <pre className="rounded-2xl bg-canvas px-4 py-3 font-mono text-sm break-all whitespace-pre-wrap">bun run reset-link seu@email.com</pre>
       <p className="text-sm text-muted">O link vale por 1 hora e funciona uma única vez.</p>
     </div>
   );

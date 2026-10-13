@@ -10,12 +10,12 @@ export function ThemeToggle() {
   const next = theme === "dark" ? "light" : "dark";
 
   return (
-    <fetcher.Form method="post" action={THEME_ACTION}>
+    <fetcher.Form method="post" action={THEME_ACTION} className="shrink-0">
       <input type="hidden" name="theme" value={next} />
       <button
         type="submit"
         aria-label={next === "light" ? "Usar tema claro" : "Usar tema escuro"}
-        className="grid size-10 place-items-center rounded-full text-muted transition hover:bg-ink/5 hover:text-ink"
+        className="grid size-10 shrink-0 place-items-center rounded-full text-muted transition hover:bg-ink/5 hover:text-ink"
       >
         {theme === "dark" ? <Sun className="size-4" aria-hidden /> : <Moon className="size-4" aria-hidden />}
       </button>

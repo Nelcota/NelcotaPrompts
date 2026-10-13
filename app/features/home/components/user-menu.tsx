@@ -30,7 +30,7 @@ export function UserMenu({ user, query, onEditPhoto, onEditAccount }: UserMenuPr
     <DropdownMenu.Root modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenu.Trigger
         aria-label="Menu da conta"
-        className="grid size-10 place-items-center rounded-full ring-line transition outline-none hover:ring-4 focus-visible:ring-4 data-[state=open]:ring-4"
+        className="grid size-10 shrink-0 place-items-center rounded-full ring-line transition outline-none hover:ring-4 focus-visible:ring-4 data-[state=open]:ring-4"
       >
         <Avatar name={user.name} url={user.avatarUrl} sizeClassName="size-10" fallbackClassName="bg-ink text-base text-canvas" />
       </DropdownMenu.Trigger>

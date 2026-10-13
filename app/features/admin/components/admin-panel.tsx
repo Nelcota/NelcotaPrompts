@@ -11,13 +11,27 @@ import { OverviewTab } from "./overview-tab";
 import { PromptsTab } from "./prompts-tab";
 import { UsersTab } from "./users-tab";
 
-const TAB_LABELS: Record<AdminTab, string> = {
-  visao: "Visão geral",
-  usuarios: "Usuários",
-  prompts: "Prompts",
-  convite: "Convite",
-  marca: "Marca",
+// short: rótulo no celular, para as cinco abas caberem numa linha de 360px.
+const TAB_LABELS: Record<AdminTab, { full: string; short?: string }> = {
+  visao: { full: "Visão geral", short: "Geral" },
+  usuarios: { full: "Usuários" },
+  prompts: { full: "Prompts" },
+  convite: { full: "Convite" },
+  marca: { full: "Marca" },
 };
+
+function TabLabel({ full, short }: { full: string; short?: string }) {
+  if (short === undefined) {
+    return full;
+  }
+
+  return (
+    <>
+      <span className="sm:hidden">{short}</span>
+      <span className="hidden sm:inline">{full}</span>
+    </>
+  );
+}
 
 function TabContent({ data, adminId }: { data: AdminTabData; adminId: string }) {
   switch (data.tab) {
@@ -57,15 +71,17 @@ export function AdminPanel({ admin, data }: { admin: SessionUser; data: AdminTab
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <h1 className="font-display text-4xl font-light tracking-tight">Painel admin</h1>
-        <nav aria-label="Seções do painel" className="no-scrollbar mt-5 flex gap-1 overflow-x-auto border-b border-line">
+        <nav aria-label="Seções do painel" className="no-scrollbar mt-5 flex gap-0.5 overflow-x-auto border-b border-line sm:gap-1">
           {(Object.keys(TAB_LABELS) as AdminTab[]).map((key) => (
             <Link
               key={key}
               to={key === "visao" ? "/admin" : `/admin?aba=${key}`}
               aria-current={key === data.tab ? "page" : undefined}
-              className="-mb-px shrink-0 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted transition hover:text-ink aria-[current=page]:border-ink aria-[current=page]:text-ink"
+              // Se a tela for estreita demais e a barra rolar, a aba aberta fica à vista.
+              ref={key === data.tab ? (link) => link?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
+              className="-mb-px shrink-0 border-b-2 border-transparent px-2 py-2 sm:px-3 text-sm font-medium text-muted transition hover:text-ink aria-[current=page]:border-ink aria-[current=page]:text-ink"
             >
-              {TAB_LABELS[key]}
+              <TabLabel {...TAB_LABELS[key]} />
             </Link>
           ))}
         </nav>

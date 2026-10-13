@@ -16,8 +16,8 @@ function NavbarPreview({ theme, previewUrl }: { theme: "dark" | "light"; preview
     <div>
       <p className="mb-1.5 font-mono text-xs text-muted">tema {theme === "dark" ? "escuro" : "claro"}</p>
       <div className={cn(theme, "overflow-hidden rounded-2xl border border-line")}>
-        <div className="font-display flex h-16 items-center gap-3 bg-canvas px-4 text-3xl font-light tracking-tight whitespace-nowrap text-ink">
-          <BrandWordmark logoClassName="h-10" src={previewUrl} />
+        <div className="font-display flex h-16 items-center gap-2.5 bg-canvas px-4 text-2xl sm:gap-3 sm:text-3xl font-light tracking-tight whitespace-nowrap text-ink">
+          <BrandWordmark logoClassName="h-8 sm:h-10" src={previewUrl} />
         </div>
       </div>
     </div>

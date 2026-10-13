@@ -49,7 +49,7 @@ export function BrandWordmark({ logoClassName, src, hideTextOnMobile = false }: 
   return (
     <>
       <BrandLogo className={logoClassName} src={src} />
-      <span className={hideTextOnMobile ? "hidden sm:inline" : undefined}>
+      <span className={hideTextOnMobile ? "hidden truncate sm:inline" : "truncate"}>
         Nelcota <span className="text-muted">Prompts</span>
       </span>
     </>

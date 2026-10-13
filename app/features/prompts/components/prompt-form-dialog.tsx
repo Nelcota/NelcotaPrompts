@@ -10,6 +10,9 @@ import type { Prompt, PromptActionData } from "~/features/prompts/types";
 import { Dialog } from "~/shared/ui/dialog";
 import { Field } from "~/shared/ui/field";
 import { buttonClass } from "~/shared/ui/styles";
+import { MarkdownBody } from "./markdown-body";
+
+const MODE_BUTTON = "rounded-md px-1.5 py-0.5 text-sm text-muted transition hover:text-ink aria-pressed:bg-ink/10 aria-pressed:text-ink";
 
 export type Editing = { mode: "create" } | { mode: "edit"; prompt: Prompt; body: string };
 
@@ -28,6 +31,8 @@ export function PromptFormDialog({ editing, onClose }: PromptFormDialogProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [dirty, setDirty] = useState(false);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  // Texto mostrado na pré-visualização; null = editando. O textarea segue no formulário.
+  const [preview, setPreview] = useState<string | null>(null);
 
   useFetcherResult(fetcher, { onSuccess: onClose });
 
@@ -56,6 +61,12 @@ export function PromptFormDialog({ editing, onClose }: PromptFormDialogProps) {
     });
 
     setDirty(changed);
+  };
+
+  const showPreview = () => {
+    const value = formRef.current === null ? null : new FormData(formRef.current).get("body");
+
+    setPreview(typeof value === "string" ? value : "");
   };
 
   // Esc, clique fora, ✕ e Cancelar passam por aqui: com alterações, pergunta antes.
@@ -89,6 +100,11 @@ export function PromptFormDialog({ editing, onClose }: PromptFormDialogProps) {
           }
 
           setLocalErrors(checked.ok ? null : checked.errors);
+
+          // Com erro, volta ao campo para o erro (e o foco) ficarem visíveis.
+          if (!checked.ok) {
+            setPreview(null);
+          }
         }}
         noValidate
         method="post" action={HOME_ACTION} className="mt-6 space-y-4" key={prompt?.id ?? "new"}>
@@ -113,6 +129,23 @@ export function PromptFormDialog({ editing, onClose }: PromptFormDialogProps) {
           placeholder="Cole aqui o prompt que você sempre usa…"
           inputClassName="font-mono text-[15px] leading-relaxed"
           error={errors.body}
+          aside={
+            <div role="group" aria-label="Modo do prompt" className="flex gap-0.5">
+              <button type="button" aria-pressed={preview === null} onClick={() => setPreview(null)} className={MODE_BUTTON}>
+                Escrever
+              </button>
+              <button type="button" aria-pressed={preview !== null} onClick={showPreview} className={MODE_BUTTON}>
+                Visualizar
+              </button>
+            </div>
+          }
+          replacement={
+            preview === null ? undefined : (
+              <div className="max-h-[45dvh] min-h-60 overflow-auto rounded-2xl border border-line bg-canvas px-4 py-3">
+                {preview.trim() === "" ? <p className="text-base text-muted">Nada para visualizar ainda.</p> : <MarkdownBody text={preview} />}
+              </div>
+            )
+          }
           hint={
             <>
               Escreva <code className="rounded bg-ink/10 px-1 font-mono">{"{tema}"}</code> para trechos que mudam a cada uso, ou{" "}

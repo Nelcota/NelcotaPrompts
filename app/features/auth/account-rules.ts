@@ -34,4 +34,6 @@ export const changePasswordSchema = z
   .object({ current: secret("Informe sua senha atual."), next: newPassword })
   .refine((value) => value.current !== value.next, { path: ["next"], message: "A nova senha precisa ser diferente da atual." });
 
+export const forgotPasswordSchema = z.object({ email });
+
 export const resetPasswordSchema = z.object({ token: z.string().trim().default(""), password: newPassword });

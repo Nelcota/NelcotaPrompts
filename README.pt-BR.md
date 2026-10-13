@@ -49,6 +49,8 @@ Build de produção local: `bun run build && bun run start`. Em produção o coo
 | `SESSION_SECRET` | Segredo longo e aleatório que assina o cookie de sessão |
 | `INVITE_CODE` | Código padrão do cadastro quando o painel exige convite (o painel também pode trocar sem redeploy) |
 | `PORT` | Porta HTTP do `server.ts` (padrão 3000) |
+| `RESEND_API_KEY` | Liga o "Esqueci minha senha" por email ([Resend](https://resend.com)); sem ela, o link vem de um admin |
+| `EMAIL_FROM` | Remetente, de um domínio verificado no Resend: `Nelcota Prompts <nao-responda@seudominio.com>` |
 | `APP_URL` | Endereço público (`https://prompts.seudominio.com`), mostrado no log de inicialização e usado pelo `reset-link`. No Coolify, o padrão é o domínio do app |
 | `TRUSTED_PROXY` | Opcional. `cloudflare` se houver Cloudflare (proxy ativo) na frente do Coolify |
 
@@ -100,7 +102,7 @@ A imagem é `oven/bun`, sem Node. O único `node` que existe nela é o symlink d
 - **Navegação:** no slider, a roda do mouse (ou o trackpad) passa um prompt por vez; também dá para arrastar ou usar as setas do teclado. Clique no card central para abrir o prompt completo.
 - **Permissões:** quem está logado lê tudo. Editar e apagar passam por `action` no servidor, que confere se o usuário é o autor (`403` se não for) e repete o filtro `author_id` no próprio `UPDATE`/`DELETE`.
 - **Sessões:** ficam na tabela `sessions`; o cookie assinado carrega só o id. Sair apaga a linha, então um cookie copiado deixa de valer na hora.
-- **Limite de tentativas** (rate-limiter-flexible, em memória): login aceita 5 tentativas por email (em cada IP) e 30 por IP a cada 15 min (login certo devolve a tentativa do IP); cadastro 10 por IP por hora; redefinição de senha 20 por IP por hora; senha atual errada em "Minha conta" 5 a cada 15 min; 20 uploads de foto por hora. Conferir e contar é uma operação só. O IP vem do `X-Forwarded-For` só quando a conexão chega pelo proxy da rede interna; com `TRUSTED_PROXY=cloudflare`, o `CF-Connecting-IP` só vale se quem se conectou ao proxy estiver nas faixas publicadas do Cloudflare (cabeçalho forjado direto na origem é ignorado).
+- **Limite de tentativas** (rate-limiter-flexible, em memória): login aceita 5 tentativas por email (em cada IP) e 30 por IP a cada 15 min (login certo devolve a tentativa do IP); cadastro 10 por IP por hora; redefinição de senha 20 por IP por hora; "esqueci minha senha" 10 pedidos por IP e 3 emails por endereço por hora; senha atual errada em "Minha conta" 5 a cada 15 min; 20 uploads de foto por hora. Conferir e contar é uma operação só. O IP vem do `X-Forwarded-For` só quando a conexão chega pelo proxy da rede interna; com `TRUSTED_PROXY=cloudflare`, o `CF-Connecting-IP` só vale se quem se conectou ao proxy estiver nas faixas publicadas do Cloudflare (cabeçalho forjado direto na origem é ignorado).
 - **Headers de segurança:** em produção vão CSP com nonce, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` e HSTS. Envios (POST) vindos de outro site são recusados pelo `server.ts` (checagem de `Origin`/`Sec-Fetch-Site`), o que também impede "login CSRF".
 - **Paginação:** a página mostra 60 prompts e o botão "Carregar mais" sobe até 600. Para achar os mais antigos, use a busca.
 - **Migrations:** `bun run migrate` usa um advisory lock do Postgres, então duas instâncias subindo juntas não aplicam a mesma migration duas vezes.

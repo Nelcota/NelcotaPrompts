@@ -29,6 +29,7 @@ Write a prompt once, share it with your team, copy it with the blanks already fi
 | **Version history** | Every edit keeps the previous version. See a word-level diff and restore any of them. |
 | **Full-text search** | Accent-insensitive Portuguese search with stemming, prefix matching while you type and typo tolerance on titles. |
 | **Favorites & most copied** | Star prompts, sort by copy count, filter by author. |
+| **Password reset by email** | "Forgot password" sends a one-time link through [Resend](https://resend.com). Without it, an admin generates the link. |
 | **Trash with undo** | Deleting is reversible for 7 days. |
 | **Profile photos** | In-browser editor: crop, zoom, rotate, flip, brightness, contrast, saturation, temperature and presets. |
 | **Admin panel** | Users (reset links, admin role, sessions, block, delete), moderation and trash, invite toggle and code, logo. |
@@ -91,6 +92,8 @@ bun run dev           # http://localhost:5173
 | `INVITE_CODE` |  | Default sign-up code, used when the admin panel requires an invite. The panel can also set or rotate it at runtime |
 | `PORT` |  | Port for `server.ts` (default `3000`) |
 | `APP_URL` |  | Public address (`https://prompts.example.com`), shown in the startup log and used by `reset-link`. On Coolify it defaults to the app's domain |
+| `RESEND_API_KEY` |  | Enables password reset by email ([Resend](https://resend.com)) |
+| `EMAIL_FROM` |  | Sender, from a domain verified in Resend: `Nelcota Prompts <no-reply@example.com>` |
 | `TRUSTED_PROXY` |  | Set to `cloudflare` when Cloudflare proxies the app, so the client IP comes from `CF-Connecting-IP` |
 
 Generate a secret with:

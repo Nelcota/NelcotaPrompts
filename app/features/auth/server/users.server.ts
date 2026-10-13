@@ -29,6 +29,16 @@ export async function findUserById(id: string): Promise<PublicUser | null> {
   return { id: row.id, email: row.email, name: row.name, isAdmin: row.isAdmin, avatarUrl: avatarUrl(row.id, row.avatarVersion) };
 }
 
+// Conta ativa com esse email (para o "esqueci minha senha"); bloqueada = null.
+export async function findActiveUserByEmail(email: string): Promise<UserIdentity | null> {
+  const [row] = await getDb()
+    .select({ id: users.id, email: users.email, name: users.name })
+    .from(users)
+    .where(and(eq(users.email, email), isNull(users.disabledAt)));
+
+  return row ?? null;
+}
+
 // Hash fixo usado quando o email não existe, para o tempo de resposta não revelar contas.
 // Criado já ao carregar o módulo: se fosse no primeiro login com email desconhecido, essa
 // resposta (hash + verify) sairia mais lenta que uma senha errada.

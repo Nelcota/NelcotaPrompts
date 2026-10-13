@@ -133,3 +133,62 @@ dialog::backdrop {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Realce de sintaxe dos blocos de código (classes do highlight.js, via rehype-highlight). */
+:root,
+.light {
+  --code-keyword: #9a3412;
+  --code-string: #15803d;
+  --code-number: #1d4ed8;
+  --code-title: #7c3aed;
+  --code-comment: #8a8378;
+}
+
+:root.dark,
+.dark {
+  --code-keyword: #fb923c;
+  --code-string: #86efac;
+  --code-number: #93c5fd;
+  --code-title: #c4b5fd;
+  --code-comment: #7d786f;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-type,
+.hljs-meta {
+  color: var(--code-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-selector-attr {
+  color: var(--code-string);
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-attribute {
+  color: var(--code-number);
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: var(--code-title);
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-deletion {
+  color: var(--code-comment);
+  font-style: italic;
+}

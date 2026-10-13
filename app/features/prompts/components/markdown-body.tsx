@@ -1,8 +1,12 @@
 import type { Element, ElementContent, Root } from "hast";
+import { Check, Copy } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
+import { copyText } from "~/shared/lib/copy-text";
 import { variableMarkClass } from "~/shared/ui/styles";
 import { splitVariables } from "../variables";
 
@@ -14,7 +18,18 @@ import { splitVariables } from "../variables";
 // Markdown: assim um padrão com sintaxe ({site=https://x}, {x=**y**}, {cmd=`ls`}) não é
 // quebrado em link, negrito ou código. Depois, o plugin (rehype) devolve o texto original
 // dentro de <mark>, inclusive em blocos de código; num atributo (href) volta como texto.
-const PLACEHOLDER = /\uE000(\d+)\uE001/g;
+// O índice também vai como caractere de uso privado (não dígito): assim o realce de
+// sintaxe não o confunde com um número e não parte o marcador em dois tokens.
+const PLACEHOLDER = /\uE000([\uE100-\uF8FF])\uE001/g;
+const INDEX_BASE = 0xe100;
+
+function placeholder(index: number): string {
+  return `\uE000${String.fromCharCode(INDEX_BASE + index)}\uE001`;
+}
+
+function indexOf(char: string): number {
+  return char.charCodeAt(0) - INDEX_BASE;
+}
 
 function protectVariables(text: string): { source: string; variables: string[] } {
   const variables: string[] = [];
@@ -26,15 +41,15 @@ function protectVariables(text: string): { source: string; variables: string[] }
 
       variables.push(part.value);
 
-      return `\uE000${variables.length - 1}\uE001`;
+      return placeholder(variables.length - 1);
     })
     .join("");
 
   return { source, variables };
 }
 
-function rehypeVariables(variables: string[]) {
-  const restore = (value: string) => value.replace(PLACEHOLDER, (_match, index: string) => variables[Number(index)] ?? "");
+function rehypeVariables(variables: string[], markClass: string) {
+  const restore = (value: string) => value.replace(PLACEHOLDER, (_match, index: string) => variables[indexOf(index)] ?? "");
 
   const highlight = (node: Root | Element) => {
     // O Markdown codifica a URL (%EE%80%80…): decodifica antes de devolver a variável.
@@ -60,7 +75,7 @@ function rehypeVariables(variables: string[]) {
       return child.value.split(PLACEHOLDER).map((part, index): ElementContent =>
         // split com grupo: posições ímpares são os índices das variáveis.
         index % 2 === 1
-          ? { type: "element", tagName: "mark", properties: { className: variableMarkClass.split(" ") }, children: [{ type: "text", value: variables[Number(part)] ?? "" }] }
+          ? { type: "element", tagName: "mark", properties: { className: markClass.split(" ") }, children: [{ type: "text", value: variables[indexOf(part)] ?? "" }] }
           : { type: "text", value: part },
       );
     });
@@ -91,6 +106,52 @@ function languageOf(node: Element | undefined): string | null {
   const language = classes.map(String).find((name) => name.startsWith("language-"));
 
   return language === undefined ? null : language.slice("language-".length);
+}
+
+// Texto do bloco como escrito (as {variáveis} já voltaram para dentro dos <mark>).
+function textOf(node: Element | ElementContent | undefined): string {
+  if (node === undefined) {
+    return "";
+  }
+
+  if (node.type === "text") {
+    return node.value;
+  }
+
+  if (node.type !== "element") {
+    return "";
+  }
+
+  return node.children.map(textOf).join("");
+}
+
+const FEEDBACK_MS = 2000;
+
+function CopyCodeButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setCopied(false), FEEDBACK_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  const Icon = copied ? Check : Copy;
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copyText(code.replace(/\n$/, ""), "Código copiado.").then(setCopied)}
+      className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 font-sans text-xs text-muted transition hover:bg-ink/5 hover:text-ink"
+    >
+      <Icon aria-hidden className="size-3.5" />
+      {copied ? "Copiado" : "Copiar"}
+    </button>
+  );
 }
 
 const COMPONENTS: Components = {
@@ -124,13 +185,17 @@ const COMPONENTS: Components = {
   ),
   th: ({ children }) => <th className="border-b border-line px-2 py-1.5 font-semibold">{children}</th>,
   td: ({ children }) => <td className="border-b border-line/60 px-2 py-1.5 align-top">{children}</td>,
-  // Bloco de código: moldura com a linguagem (```bash) e rolagem horizontal.
+  // Bloco de código: moldura com a linguagem (```bash), botão de copiar, realce de sintaxe
+  // (cores em app.css) e rolagem horizontal.
   pre: ({ children, node }) => {
     const language = languageOf(node);
 
     return (
       <div className="overflow-hidden rounded-xl border border-line bg-surface">
-        {language === null ? null : <div className="border-b border-line px-3 py-1 font-mono text-xs text-muted">{language}</div>}
+        <div className="flex items-center gap-2 border-b border-line py-1 pr-1.5 pl-3 font-mono text-xs text-muted">
+          {language}
+          <CopyCodeButton code={textOf(node?.children[0])} />
+        </div>
         <pre className="overflow-x-auto p-3 font-mono text-[13.5px] leading-relaxed [&_code]:bg-transparent [&_code]:p-0">{children}</pre>
       </div>
     );
@@ -143,9 +208,86 @@ export function MarkdownBody({ text }: { text: string }) {
 
   return (
     <div className="space-y-3 text-[15px] leading-relaxed [&_strong]:font-semibold">
-      <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} rehypePlugins={[rehypeVariables(variables)]} components={COMPONENTS}>
+      <Markdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[rehypeHighlight, rehypeVariables(variables, variableMarkClass)]}
+        components={COMPONENTS}
+      >
         {source}
       </Markdown>
     </div>
+  );
+}
+
+// Prévia no card: o mesmo Markdown, mas tudo em linha (cabe no line-clamp). Blocos viram
+// trechos separados por espaço, títulos ficam em negrito e links não são clicáveis (o card
+// inteiro abre o prompt).
+function inline({ children }: { children?: ReactNode }) {
+  return <span>{children} </span>;
+}
+
+function bold({ children }: { children?: ReactNode }) {
+  return <strong className="font-semibold text-white/90">{children} </strong>;
+}
+
+function passthrough({ children }: { children?: ReactNode }) {
+  return <>{children}</>;
+}
+
+const PREVIEW_COMPONENTS: Components = {
+  h1: bold,
+  h2: bold,
+  h3: bold,
+  h4: bold,
+  h5: bold,
+  h6: bold,
+  p: inline,
+  li: inline,
+  blockquote: inline,
+  td: inline,
+  th: inline,
+  ul: passthrough,
+  ol: passthrough,
+  table: passthrough,
+  thead: passthrough,
+  tbody: passthrough,
+  tr: passthrough,
+  br: () => " ",
+  hr: () => null,
+  img: () => null,
+  input: ({ checked }) => (checked === true ? "☑ " : "☐ "),
+  a: passthrough,
+  pre: ({ children }) => <span>{children} </span>,
+  code: ({ children }) => <code className="rounded bg-white/15 px-1 text-white/85">{children}</code>,
+};
+
+const PREVIEW_MARK_CLASS = "rounded bg-amber-300/30 px-0.5 text-white";
+
+export function MarkdownPreview({ text, className }: { text: string; className?: string }) {
+  const { source, variables } = protectVariables(text);
+
+  return (
+    <div className={className}>
+      <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeVariables(variables, PREVIEW_MARK_CLASS)]} components={PREVIEW_COMPONENTS}>
+        {source}
+      </Markdown>
+    </div>
+  );
+}
+
+// Títulos aceitam só `código` (o resto é texto puro).
+export function InlineCodeText({ text, codeClassName }: { text: string; codeClassName: string }) {
+  return (
+    <>
+      {text.split(/`([^`]+)`/).map((part, index) =>
+        index % 2 === 1 ? (
+          <code key={index} className={codeClassName}>
+            {part}
+          </code>
+        ) : (
+          part
+        ),
+      )}
+    </>
   );
 }

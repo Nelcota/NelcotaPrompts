@@ -40,6 +40,7 @@ Build de produção local: `bun run build && bun run start`. Em produção o coo
 | `bun run reset-link email [url]` | Gera um link de redefinição de senha (1 hora, uso único) |
 | `bun run make-admin email [--remover]` | Dá (ou tira) acesso ao painel admin em `/admin` |
 | `bun run typecheck` | Gera os tipos das rotas e roda o `tsc` |
+| `bun run lint` | [oxlint](https://oxc.rs) (`.oxlintrc.json`; `else` depois de `return` é erro) |
 
 ## Variáveis de ambiente
 

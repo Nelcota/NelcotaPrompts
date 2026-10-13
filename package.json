@@ -9,6 +9,7 @@
     "start": "NODE_ENV=production bun --bun run server.ts",
     "migrate": "bun --bun run scripts/migrate.ts",
     "seed": "bun --bun run scripts/seed.ts",
+    "lint": "oxlint",
     "typecheck": "bun --bun react-router typegen && bun --bun tsc",
     "reset-link": "bun --bun run scripts/reset-link.ts",
     "make-admin": "bun --bun run scripts/make-admin.ts"
@@ -51,6 +52,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "drizzle-kit": "^0.31.11",
+    "oxlint": "^1.88.0",
     "postgres": "^3.4.9",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",

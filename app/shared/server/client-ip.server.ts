@@ -57,6 +57,34 @@ function lastForwardedFor(request: Request): string | null {
   return last ?? null;
 }
 
+let warnedProxy = false;
+let warnedSocket = false;
+
+function warnMissingSocketIp() {
+  if (!warnedSocket) {
+    warnedSocket = true;
+    console.warn("Requisição sem IP do socket em produção: limites de tentativa ficam compartilhados entre todos.");
+  }
+}
+
+// TRUSTED_PROXY: só "cloudflare" (sem diferenciar maiúsculas) liga o CF-Connecting-IP.
+// Um valor digitado errado ("Cloudfare") não pode ser ignorado em silêncio: atrás do
+// Cloudflare, todo mundo cairia no mesmo IP do proxy e dividiria o limite de tentativas.
+export function trustsCloudflare(raw: string | undefined): boolean {
+  const value = raw?.trim().toLowerCase() ?? "";
+
+  if (value === "cloudflare") {
+    return true;
+  }
+
+  if (value !== "" && !warnedProxy) {
+    warnedProxy = true;
+    console.warn(`TRUSTED_PROXY="${raw}" não é reconhecido (use "cloudflare" ou deixe vazio); o CF-Connecting-IP está sendo ignorado.`);
+  }
+
+  return false;
+}
+
 // Só confia nos cabeçalhos de proxy quando a conexão vem de um proxy da rede interna;
 // assim ninguém burla o limite de tentativas forjando X-Forwarded-For direto na porta.
 // Atrás do Cloudflare (TRUSTED_PROXY=cloudflare), o CF-Connecting-IP só vale quando
@@ -65,9 +93,17 @@ function lastForwardedFor(request: Request): string | null {
 export function getClientIp(request: Request, context: AppLoadContext | undefined): string {
   const socketIp = context?.clientIp;
 
-  // No dev do Vite não há IP do socket: usa o cabeçalho, se houver.
+  // No dev do Vite não há IP do socket: usa o cabeçalho, se houver. Em produção o server.ts
+  // sempre passa o IP; sem ele, o cabeçalho poderia ser forjado para escapar do limite,
+  // então todos caem na mesma chave (mais restritivo) e o log avisa.
   if (socketIp === undefined || socketIp === "") {
-    return lastForwardedFor(request) ?? "desconhecido";
+    if (process.env.NODE_ENV !== "production") {
+      return lastForwardedFor(request) ?? "desconhecido";
+    }
+
+    warnMissingSocketIp();
+
+    return "desconhecido";
   }
 
   if (!isInternal(socketIp)) {
@@ -77,7 +113,7 @@ export function getClientIp(request: Request, context: AppLoadContext | undefine
   const proxiedIp = lastForwardedFor(request) ?? socketIp;
   const cloudflareIp = request.headers.get("cf-connecting-ip")?.trim();
 
-  if (process.env.TRUSTED_PROXY?.trim() === "cloudflare" && cloudflareIp && isCloudflare(proxiedIp)) {
+  if (trustsCloudflare(process.env.TRUSTED_PROXY) && cloudflareIp !== undefined && cloudflareIp !== "" && isCloudflare(proxiedIp)) {
     return cloudflareIp;
   }
 

@@ -25,7 +25,7 @@ function resetPath(token: string): string {
 // Gera um link de uso único para o usuário. O token só existe no link; no banco fica o
 // hash. Um link novo invalida os anteriores: a transação trava a linha do usuário, então
 // duas gerações ao mesmo tempo (painel e terminal) não deixam dois links valendo.
-// null = usuário não existe.
+// null = usuário não existe ou está bloqueado.
 export async function createResetLink(userId: string, db: Db = getDb()): Promise<string | null> {
   const token = randomBytes(32).toString("base64url");
 

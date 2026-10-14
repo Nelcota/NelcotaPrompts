@@ -20,6 +20,13 @@ function emailConfig(): EmailConfig | null {
 
   cached = apiKey === "" || from === "" || baseUrl === null ? null : { client: new Resend(apiKey), from, baseUrl };
 
+  // Configuração pela metade (ex.: chave sem EMAIL_FROM) desliga o envio: avisa no log em
+  // vez de deixar o "esqueci minha senha" sem email sem ninguém saber por quê.
+  if (cached === null && (apiKey !== "" || from !== "")) {
+    const missing = [apiKey === "" && "RESEND_API_KEY", from === "" && "EMAIL_FROM", baseUrl === null && "APP_URL (ou COOLIFY_URL)"].filter(Boolean);
+    console.warn(`Envio de email desligado: falta ${missing.join(", ")}.`);
+  }
+
   return cached;
 }
 

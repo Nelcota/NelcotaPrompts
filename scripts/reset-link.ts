@@ -24,7 +24,8 @@ const path = await createResetLink(user.id, connection.db);
 
 if (path === null) {
   await connection.client.close();
-  fail(`Nenhuma conta com o email ${email}.`);
+  // A conta existe (findUserByEmail achou): null aqui é conta bloqueada (ou excluída agora).
+  fail(`A conta ${email} está bloqueada (ou acabou de ser excluída). Desbloqueie no painel antes de gerar o link.`);
 }
 
 console.log(`Link para ${user.name} (vale ${RESET_TTL_MINUTES} minutos, uma única vez):`);

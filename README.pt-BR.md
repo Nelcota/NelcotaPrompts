@@ -41,6 +41,7 @@ Build de produção local: `bun run build && bun run start`. Em produção o coo
 | `bun run make-admin email [--remover]` | Dá (ou tira) acesso ao painel admin em `/admin` |
 | `bun run typecheck` | Gera os tipos das rotas e roda o `tsc` |
 | `bun run lint` | [oxlint](https://oxc.rs) (`.oxlintrc.json`; `else` depois de `return` é erro) |
+| `bun run test` | Testes (`bun test`, `*.test.ts` ao lado do código). Os `*.db.test.ts` só rodam com `TEST_DATABASE_URL` apontando para um banco descartável já migrado |
 
 ## Variáveis de ambiente
 

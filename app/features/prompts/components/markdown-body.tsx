@@ -29,34 +29,37 @@ import { splitVariables } from "../variables";
 // Markdown: assim um padrão com sintaxe ({site=https://x}, {x=**y**}, {cmd=`ls`}) não é
 // quebrado em link, negrito ou código. Depois, o plugin (rehype) devolve o texto original
 // dentro de <mark>, inclusive em blocos de código; num atributo (href) volta como texto.
-// O índice também vai como caractere de uso privado (não dígito): assim o realce de
-// sintaxe não o confunde com um número e não parte o marcador em dois tokens.
-const PLACEHOLDER = /\uE000([\uE100-\uF8FF])\uE001/g;
+// O índice vai em dois caracteres de uso privado (não dígitos, base 256): assim o realce
+// de sintaxe não o confunde com um número e cabem 65.536 trechos, mais que um corpo de
+// 20.000 caracteres consegue ter. Os próprios caracteres de abertura/fechamento digitados
+// pela pessoa também viram trechos (sem <mark>): senão seriam lidos como marcador e sumiriam.
+const PLACEHOLDER = /\uE000([\uE100-\uE1FF]{2})\uE001/g;
+const DELIMITERS = /[\uE000\uE001]/g;
 const INDEX_BASE = 0xe100;
+const INDEX_RADIX = 256;
+
+type Protected = { text: string; variable: boolean };
 
 function placeholder(index: number): string {
-  return `\uE000${String.fromCharCode(INDEX_BASE + index)}\uE001`;
+  return `\uE000${String.fromCharCode(INDEX_BASE + Math.floor(index / INDEX_RADIX), INDEX_BASE + (index % INDEX_RADIX))}\uE001`;
 }
 
-function indexOf(char: string): number {
-  return char.charCodeAt(0) - INDEX_BASE;
+function indexOf(chars: string): number {
+  return (chars.charCodeAt(0) - INDEX_BASE) * INDEX_RADIX + (chars.charCodeAt(1) - INDEX_BASE);
 }
 
-function protectVariables(text: string): { source: string; variables: string[] } {
-  const variables: string[] = [];
+function protectVariables(text: string): { source: string; entries: Protected[] } {
+  const entries: Protected[] = [];
+  const protect = (value: string, variable: boolean) => {
+    entries.push({ text: value, variable });
+
+    return placeholder(entries.length - 1);
+  };
   const source = splitVariables(text)
-    .map((part) => {
-      if (part.kind === "text") {
-        return part.value;
-      }
-
-      variables.push(part.value);
-
-      return placeholder(variables.length - 1);
-    })
+    .map((part) => (part.kind === "text" ? part.value.replace(DELIMITERS, (char) => protect(char, false)) : protect(part.value, true)))
     .join("");
 
-  return { source, variables };
+  return { source, entries };
 }
 
 // Realce de sintaxe (lowlight) só com as linguagens mais comuns em prompts: o pacote
@@ -87,8 +90,8 @@ function rehypeHighlight() {
   return (tree: Root) => visit(tree);
 }
 
-function rehypeVariables(variables: string[], markClass: string) {
-  const restore = (value: string) => value.replace(PLACEHOLDER, (_match, index: string) => variables[indexOf(index)] ?? "");
+function rehypeVariables(entries: Protected[], markClass: string) {
+  const restore = (value: string) => value.replace(PLACEHOLDER, (_match, index: string) => entries[indexOf(index)]?.text ?? "");
 
   const highlight = (node: Root | Element) => {
     // O Markdown codifica a URL (%EE%80%80…): decodifica antes de devolver a variável.
@@ -111,12 +114,20 @@ function rehypeVariables(variables: string[], markClass: string) {
         return child.type === "doctype" ? [] : [child];
       }
 
-      return child.value.split(PLACEHOLDER).map((part, index): ElementContent =>
-        // split com grupo: posições ímpares são os índices das variáveis.
-        index % 2 === 1
-          ? { type: "element", tagName: "mark", properties: { className: markClass.split(" ") }, children: [{ type: "text", value: variables[indexOf(part)] ?? "" }] }
-          : { type: "text", value: part },
-      );
+      return child.value.split(PLACEHOLDER).map((part, index): ElementContent => {
+        // split com grupo: posições ímpares são os índices dos trechos protegidos.
+        if (index % 2 === 0) {
+          return { type: "text", value: part };
+        }
+
+        const entry = entries[indexOf(part)];
+
+        if (entry === undefined || !entry.variable) {
+          return { type: "text", value: entry?.text ?? "" };
+        }
+
+        return { type: "element", tagName: "mark", properties: { className: markClass.split(" ") }, children: [{ type: "text", value: entry.text }] };
+      });
     });
   };
 
@@ -212,11 +223,16 @@ const COMPONENTS: Components = {
   input: ({ checked }) => <input type="checkbox" checked={checked} disabled className="mr-1.5 align-middle accent-ink" />,
   blockquote: ({ children }) => <blockquote className="border-l-2 border-line pl-3 text-muted">{children}</blockquote>,
   hr: () => <hr className="border-line" />,
-  a: ({ children, href }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="underline underline-offset-4 hover:text-ink">
-      {children}
-    </a>
-  ),
+  // Endereço recusado pelo react-markdown (ex.: javascript:, ou uma {variável} com ":" que
+  // parece protocolo) chega vazio: href="" abriria a própria página. Fica só o texto.
+  a: ({ children, href }) =>
+    href === undefined || href.trim() === "" ? (
+      <span className="underline decoration-dotted underline-offset-4">{children}</span>
+    ) : (
+      <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="underline underline-offset-4 hover:text-ink">
+        {children}
+      </a>
+    ),
   table: ({ children }) => (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left text-sm">{children}</table>
@@ -243,13 +259,13 @@ const COMPONENTS: Components = {
 };
 
 export function MarkdownBody({ text }: { text: string }) {
-  const { source, variables } = protectVariables(text);
+  const { source, entries } = protectVariables(text);
 
   return (
     <div className="space-y-3 text-[15px] leading-relaxed [&_strong]:font-semibold">
       <Markdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
-        rehypePlugins={[rehypeHighlight, rehypeVariables(variables, variableMarkClass)]}
+        rehypePlugins={[rehypeHighlight, rehypeVariables(entries, variableMarkClass)]}
         components={COMPONENTS}
       >
         {source}
@@ -303,11 +319,11 @@ const PREVIEW_COMPONENTS: Components = {
 const PREVIEW_MARK_CLASS = "rounded bg-amber-300/30 px-0.5 text-white";
 
 export function MarkdownPreview({ text, className }: { text: string; className?: string }) {
-  const { source, variables } = protectVariables(text);
+  const { source, entries } = protectVariables(text);
 
   return (
     <div className={className}>
-      <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeVariables(variables, PREVIEW_MARK_CLASS)]} components={PREVIEW_COMPONENTS}>
+      <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeVariables(entries, PREVIEW_MARK_CLASS)]} components={PREVIEW_COMPONENTS}>
         {source}
       </Markdown>
     </div>

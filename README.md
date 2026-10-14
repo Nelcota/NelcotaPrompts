@@ -79,6 +79,7 @@ bun run dev           # http://localhost:5173
 | `bun run start` | Production server (`server.ts`) |
 | `bun run typecheck` | Route type generation + `tsc` |
 | `bun run lint` | [oxlint](https://oxc.rs) (`.oxlintrc.json`; `else` after `return` is an error) |
+| `bun run test` | Tests (`bun test`, `*.test.ts` next to the code). `*.db.test.ts` only run with `TEST_DATABASE_URL` set to a throwaway, migrated database |
 | `bun run migrate` | Apply pending `migrations/NNN_*.sql` (advisory-locked, safe with parallel boots) |
 | `bun run seed` | Optional demo account and prompts. Never run it in production |
 | `bun run make-admin <email> [--remover]` | Grant (or revoke) access to `/admin` |

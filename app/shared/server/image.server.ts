@@ -50,7 +50,12 @@ export async function readUploadedImage(form: FormData, field: string, limits: U
     return { ok: false, status: 415, reason: "unsupported" };
   }
 
-  if ((metadata.width ?? 0) > limits.maxDimension || (metadata.height ?? 0) > limits.maxDimension) {
+  // Sem dimensões o sharp não entendeu a imagem: tratar como 0 deixaria passar a checagem.
+  if (metadata.width === undefined || metadata.height === undefined || metadata.width <= 0 || metadata.height <= 0) {
+    return { ok: false, status: 415, reason: "corrupt" };
+  }
+
+  if (metadata.width > limits.maxDimension || metadata.height > limits.maxDimension) {
     return { ok: false, status: 400, reason: "dimensions" };
   }
 

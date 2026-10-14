@@ -119,6 +119,11 @@ export function orient(source: HTMLCanvasElement, { rotation, flipped }: Orienta
   return canvas;
 }
 
+// Recorte utilizável: centro e zoom são números de verdade (zoom > 0).
+export function isFiniteCrop(crop: Crop): boolean {
+  return Number.isFinite(crop.centerX) && Number.isFinite(crop.centerY) && Number.isFinite(crop.zoom) && crop.zoom > 0;
+}
+
 export function cropSide(image: HTMLCanvasElement, zoom: number): number {
   return Math.min(image.width, image.height) / zoom;
 }

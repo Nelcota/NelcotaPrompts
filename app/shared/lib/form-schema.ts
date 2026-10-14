@@ -7,9 +7,18 @@ import type { FieldErrors } from "./action-result";
 
 export type SchemaResult<T> = { ok: true; data: T } | { ok: false; errors: FieldErrors };
 
-// Texto obrigatório: sem espaços nas pontas; vazio (ou ausente) dá a mensagem informada.
+// Algo que aparece na tela. trim() já tira espaços, NBSP e BOM, mas não os caracteres de
+// formatação invisíveis (zero-width space/joiner, marcas de direção): "\u200B" passaria
+// como nome ou título preenchido e sairia em branco.
+const VISIBLE = /[^\s\p{Cf}]/u;
+
+export function hasVisibleText(value: string): boolean {
+  return VISIBLE.test(value);
+}
+
+// Texto obrigatório: sem espaços nas pontas; vazio, ausente ou só invisível dá a mensagem.
 export function requiredText(message: string) {
-  return z.string({ error: message }).trim().min(1, message);
+  return z.string({ error: message }).trim().min(1, message).refine(hasVisibleText, message);
 }
 
 // Senha não passa por trim (espaços nas pontas fazem parte dela), mas só espaços é vazio.

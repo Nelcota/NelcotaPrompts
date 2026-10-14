@@ -45,6 +45,12 @@ export function hasVariables(body: string): boolean {
   return extractVariableSpecs(body).length > 0;
 }
 
+// Valor digitado para a variável, só se for do próprio objeto: o nome vem do texto do
+// prompt, e {constructor} ou {toString} leriam o Object.prototype (uma função, não texto).
+export function ownValue(values: Record<string, string>, name: string): string | undefined {
+  return Object.hasOwn(values, name) ? values[name] : undefined;
+}
+
 // Valor vazio usa o padrão da variável (de qualquer ocorrência dela); sem padrão, o
 // {trecho} fica como está.
 export function fillVariables(body: string, values: Record<string, string>): string {
@@ -52,7 +58,7 @@ export function fillVariables(body: string, values: Record<string, string>): str
 
   return body.replace(VARIABLE_PATTERN, (whole, rawName: string) => {
     const name = rawName.trim();
-    const value = values[name];
+    const value = ownValue(values, name);
 
     if (value !== undefined && value.trim() !== "") {
       return value;
@@ -115,7 +121,7 @@ export function rememberValues(values: Record<string, string>) {
   }
 
   // Os usados agora vão para o fim; os mais antigos saem quando passa do limite.
-  const previous = Object.entries(readRememberedValues()).filter(([name]) => !(name in values));
+  const previous = Object.entries(readRememberedValues()).filter(([name]) => !Object.hasOwn(values, name));
   const merged = [...previous, ...filled].slice(-REMEMBERED_MAX);
   writeStorage(REMEMBERED_KEY, JSON.stringify(Object.fromEntries(merged)));
 }

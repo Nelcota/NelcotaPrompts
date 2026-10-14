@@ -50,6 +50,13 @@ function readToggle(form: FormData): boolean | null {
   return value === "1" ? true : value === "0" ? false : null;
 }
 
+// "true"/"false" do interruptor do convite; null = valor inválido.
+export function readRequired(form: FormData): boolean | null {
+  const value = readText(form, "required");
+
+  return value === "true" ? true : value === "false" ? false : null;
+}
+
 const BRAND_UPLOAD = { maxBytes: MAX_BRAND_IMAGE_BYTES, maxDimension: MAX_BRAND_IMAGE_DIMENSION };
 
 // A logo aparece com 40 px de altura: guardada com folga para telas de alta densidade. O
@@ -221,7 +228,12 @@ export const ADMIN_HANDLERS: Record<AdminIntent, IntentHandler<Context, Extra>> 
   },
 
   async "invite-toggle"(form) {
-    const required = form.get("required") === "true";
+    const required = readRequired(form);
+
+    // Campo ausente ou estranho não pode virar "desligado": isso abriria o cadastro.
+    if (required === null) {
+      return reply("invite-toggle", 400, INVALID);
+    }
 
     await setInviteRequired(required);
 

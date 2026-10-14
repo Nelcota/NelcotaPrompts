@@ -10,6 +10,14 @@ type AvatarProps = {
   fallbackClassName: string;
 };
 
+// Primeiro caractere como a pessoa vê (grafema): charAt(0) cortaria um emoji ou uma letra
+// com acento combinado no meio e mostraria um caractere quebrado.
+const graphemes = new Intl.Segmenter("pt-BR", { granularity: "grapheme" });
+
+function firstGrapheme(text: string): string {
+  return graphemes.segment(text)[Symbol.iterator]().next().value?.segment ?? "";
+}
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter((part) => part !== "");
   const first = parts[0];
@@ -20,7 +28,7 @@ export function initials(name: string): string {
 
   const last = parts.length > 1 ? parts[parts.length - 1] : undefined;
 
-  return `${first.charAt(0)}${last?.charAt(0) ?? ""}`.toUpperCase();
+  return `${firstGrapheme(first)}${last === undefined ? "" : firstGrapheme(last)}`.toUpperCase();
 }
 
 // A foto já chega redonda (cantos transparentes), então a <img> não usa border-radius.

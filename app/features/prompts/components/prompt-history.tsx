@@ -111,6 +111,15 @@ function LineText({ line }: { line: DiffLine }) {
   );
 }
 
+function sameTags(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((tag, index) => tag === b[index]);
+}
+
+// Lista vazia aparece escrita: um espaço em branco entre "Tags:" e "→" não diz nada.
+function tagsLabel(tags: string[]): string {
+  return tags.length === 0 ? "sem tags" : tags.map((tag) => `#${tag}`).join(" ");
+}
+
 const ROW_SIGN: Record<DiffLine["kind"], string> = { same: " ", added: "+", removed: "-" };
 
 function DiffView({ before, after }: { before: string; after: string }) {
@@ -255,6 +264,14 @@ export function PromptHistory({ prompt, currentBody, isOwner, onBack, onRestored
                   <del className="text-rose-500/90">{selected.title}</del>
                   <span className="text-muted"> → </span>
                   <ins className="text-emerald-600 no-underline dark:text-emerald-400">{prompt.title}</ins>
+                </p>
+              )}
+              {sameTags(selected.tags, prompt.tags) ? null : (
+                <p className="border-b border-line px-4 py-2 text-sm">
+                  <span className="text-muted">Tags: </span>
+                  <del className="text-rose-500/90">{tagsLabel(selected.tags)}</del>
+                  <span className="text-muted"> → </span>
+                  <ins className="text-emerald-600 no-underline dark:text-emerald-400">{tagsLabel(prompt.tags)}</ins>
                 </p>
               )}
               <div className="max-h-[40dvh] overflow-auto">

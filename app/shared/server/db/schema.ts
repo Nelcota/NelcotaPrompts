@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // Schema do banco para o Drizzle tipar as consultas. A fonte de verdade continua sendo
 // migrations/*.sql (aplicadas por scripts/migrate.ts): ao mudar o banco, escreva a
@@ -8,20 +8,28 @@ import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, text, 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({ dataType: () => "bytea" });
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
+// Algo visível (migration 010): espaços e caracteres de formatação invisíveis não contam.
+const hasVisibleText = (column: string) => sql.raw(`${column} ~ '[^[:space:]\\u00AD\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\uFEFF]'`);
+
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 };
 
-export const users = pgTable("users", {
-  id: uuid().defaultRandom().primaryKey(),
-  email: text().notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  name: text().notNull(),
-  isAdmin: boolean("is_admin").default(false).notNull(),
-  // Conta bloqueada: não entra e as sessões existentes deixam de valer.
-  disabledAt: timestamp("disabled_at", { withTimezone: true }),
-  ...timestamps,
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    // Sempre em minúsculas (migration 010): o unique vale sem diferenciar caixa.
+    email: text().notNull().unique(),
+    passwordHash: text("password_hash").notNull(),
+    name: text().notNull(),
+    isAdmin: boolean("is_admin").default(false).notNull(),
+    // Conta bloqueada: não entra e as sessões existentes deixam de valer.
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [check("users_email_lowercase", sql`${table.email} = lower(${table.email})`), check("users_name_visible", hasVisibleText("name"))],
+);
 
 // Sessões no servidor: o cookie guarda só o id assinado; o usuário fica em data.userId.
 export const sessions = pgTable(
@@ -60,6 +68,7 @@ export const prompts = pgTable(
     // Lixeira: apagar marca a data; depois de 7 dias o prompt é removido de vez.
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     // Quem apagou (migration 009): o autor só restaura o que ele mesmo mandou para a lixeira.
+    // null (linha antiga ou admin excluído) = só o admin restaura.
     deletedBy: uuid("deleted_by").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -74,6 +83,8 @@ export const prompts = pgTable(
     index("prompts_created_at_idx").on(table.createdAt.desc()),
     index("prompts_live_created_idx").on(table.createdAt.desc()).where(sql`deleted_at is null`),
     index("prompts_tags_idx").using("gin", table.tags),
+    check("prompts_title_visible", hasVisibleText("title")),
+    check("prompts_body_visible", hasVisibleText("body")),
   ],
 );
 

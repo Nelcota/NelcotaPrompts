@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { copyText } from "~/shared/lib/copy-text";
 import type { Prompt } from "~/features/prompts/types";
-import { fillVariables, readRememberedValues, rememberValues, type VariableSpec } from "~/features/prompts/variables";
+import { fillVariables, ownValue, readRememberedValues, rememberValues, type VariableSpec } from "~/features/prompts/variables";
 import { Dialog } from "~/shared/ui/dialog";
 import { HighlightedVariables } from "./highlighted-variables";
 import { buttonClass, inputClass, labelClass } from "~/shared/ui/styles";
@@ -20,7 +20,7 @@ type VariablesDialogProps = {
 function initialValues(specs: VariableSpec[]): Record<string, string> {
   const remembered = readRememberedValues();
 
-  return Object.fromEntries(specs.map((spec) => [spec.name, remembered[spec.name] ?? spec.defaultValue ?? ""]));
+  return Object.fromEntries(specs.map((spec) => [spec.name, ownValue(remembered, spec.name) ?? spec.defaultValue ?? ""]));
 }
 
 // Preenche as {variáveis} do prompt antes de copiar, com prévia ao vivo.
@@ -37,7 +37,7 @@ export function VariablesDialog({ target, onClose, onCopied }: VariablesDialogPr
     return <Dialog open={false} onClose={onClose} label="Preencher variáveis" />;
   }
 
-  const missing = target.specs.filter((spec) => spec.defaultValue === null && (values[spec.name] ?? "").trim() === "");
+  const missing = target.specs.filter((spec) => spec.defaultValue === null && (ownValue(values, spec.name) ?? "").trim() === "");
 
   const copy = async () => {
     // Enter duas vezes (ou Enter + clique) não copia nem conta duas vezes.
@@ -54,7 +54,7 @@ export function VariablesDialog({ target, onClose, onCopied }: VariablesDialogPr
     setCopied(true);
     // Só o que a pessoa escolheu: o padrão deste prompt não vira "último valor" e não
     // passa por cima do padrão de outro prompt com a mesma variável.
-    rememberValues(Object.fromEntries(target.specs.filter((spec) => values[spec.name] !== spec.defaultValue).map((spec) => [spec.name, values[spec.name] ?? ""])));
+    rememberValues(Object.fromEntries(target.specs.filter((spec) => ownValue(values, spec.name) !== spec.defaultValue).map((spec) => [spec.name, ownValue(values, spec.name) ?? ""])));
     onCopied(target.prompt);
     closeTimer.current = window.setTimeout(onClose, 700);
   };
@@ -78,7 +78,7 @@ export function VariablesDialog({ target, onClose, onCopied }: VariablesDialogPr
             </span>
             <input
               data-autofocus={index === 0 ? true : undefined}
-              value={values[name] ?? ""}
+              value={ownValue(values, name) ?? ""}
               maxLength={2000}
               placeholder={defaultValue ?? undefined}
               onChange={(event) => {

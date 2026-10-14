@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { type Adjustments, centeredCrop, clampCrop, type Crop, NEUTRAL, type Orientation, orient } from "~/features/profile/avatar-image";
+import { type Adjustments, centeredCrop, clampCrop, type Crop, isFiniteCrop, NEUTRAL, type Orientation, orient } from "~/features/profile/avatar-image";
 
 const UPRIGHT: Orientation = { rotation: 0, flipped: false };
 
@@ -56,7 +56,20 @@ export function usePhotoEdit() {
 
   const flip = () => reorient((orientation) => ({ ...orientation, flipped: !orientation.flipped }), (x, y, width) => [width - x, y]);
 
-  const setCrop = (crop: Crop) => setEditing((current) => (current === null ? null : { ...current, crop }));
+  // A área do react-easy-crop pode chegar com largura 0 (zoom Infinity) ou NaN antes da
+  // imagem medir: um recorte assim geraria uma foto vazia. Fica o recorte anterior.
+  const setCrop = (crop: Crop) =>
+    setEditing((current) => {
+      if (current === null) {
+        return null;
+      }
+
+      if (!isFiniteCrop(crop)) {
+        return current;
+      }
+
+      return { ...current, crop: clampCrop(current.image, crop) };
+    });
 
   const reset = () => {
     if (editing !== null) {

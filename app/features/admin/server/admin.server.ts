@@ -26,7 +26,8 @@ export async function getAdminStats(): Promise<AdminStats> {
         prompts: count(sql`case when ${prompts.deletedAt} is null then 1 end`),
         promptsLastWeek: count(sql`case when ${prompts.deletedAt} is null and ${prompts.createdAt} > now() - interval '7 days' then 1 end`),
         trashed: count(prompts.deletedAt),
-        copies: sql<number>`coalesce(${sum(sql`case when ${prompts.deletedAt} is null then ${prompts.copyCount} end`)}, 0)::int`,
+        // bigint: somadas, as cópias de todos os prompts podem passar do limite de int.
+        copies: sql<number>`coalesce(${sum(sql`case when ${prompts.deletedAt} is null then ${prompts.copyCount} end`)}, 0)::bigint`.mapWith(Number),
       })
       .from(prompts),
     db.select({ usersWithActiveSession: countDistinct(sessionUserId) }).from(sessions).where(liveSession),

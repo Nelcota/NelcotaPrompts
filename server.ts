@@ -14,6 +14,7 @@ import { isbot } from "isbot";
 import { createRequestHandler, type ServerBuild } from "react-router";
 
 import { publicUrl } from "./app/shared/lib/public-url";
+import { readEnv } from "./app/shared/server/env.server";
 
 const SERVER_BUILD = join(import.meta.dir, "build", "server", "index.js");
 const DEFAULT_PORT = 3000;
@@ -30,14 +31,36 @@ function readPort(): number {
 
   const port = Number(raw);
 
+  // PORT definida com valor inválido é erro de configuração: subir na porta padrão deixaria
+  // o app "no ar" numa porta onde o proxy não procura.
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    console.warn(`PORT inválida (${raw}), usando ${DEFAULT_PORT}.`);
-
-    return DEFAULT_PORT;
+    console.error(`PORT inválida (${raw}). Use um número de 1 a 65535 ou deixe vazia (padrão ${DEFAULT_PORT}).`);
+    process.exit(1);
   }
 
   return port;
 }
+
+// Valor de exemplo do .env.example: copiado sem trocar, assinaria as sessões com um
+// segredo público.
+const EXAMPLE_SECRET = "troque-por-um-valor-longo-e-aleatorio";
+
+// Obrigatórias conferidas na subida: sem elas o servidor subiria "no ar" e só falharia na
+// primeira requisição que usasse o banco ou a sessão (o healthcheck nem pegaria o segredo).
+function checkRequiredEnv() {
+  try {
+    readEnv("DATABASE_URL");
+
+    if (readEnv("SESSION_SECRET") === EXAMPLE_SECRET) {
+      throw new Error("SESSION_SECRET ainda é o valor de exemplo do .env.example. Gere um valor aleatório.");
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
+
+checkRequiredEnv();
 
 function isServerBuild(value: unknown): value is ServerBuild {
   return typeof value === "object" && value !== null && "routes" in value && "entry" in value && "assets" in value;

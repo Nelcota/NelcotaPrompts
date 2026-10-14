@@ -229,8 +229,10 @@ export async function restorePrompt(promptId: string, userId: string): Promise<O
   const updated = await getDb()
     .update(prompts)
     .set({ deletedAt: null, deletedBy: null })
-    // Só o que o próprio autor apagou: o que o admin moderou fica na lixeira.
-    .where(and(eq(prompts.id, promptId), eq(prompts.authorId, userId), isRestorable, or(isNull(prompts.deletedBy), eq(prompts.deletedBy, userId))))
+    // Só o que o próprio autor apagou: o que o admin moderou fica na lixeira. deleted_by
+    // null não conta como do autor: vira null também quando a conta do admin que apagou é
+    // excluída (on delete set null), e aí o autor desfaria a moderação.
+    .where(and(eq(prompts.id, promptId), eq(prompts.authorId, userId), isRestorable, eq(prompts.deletedBy, userId)))
     .returning({ id: prompts.id });
 
   return updated.length > 0 ? "ok" : explainMiss(promptId, userId, "trash");

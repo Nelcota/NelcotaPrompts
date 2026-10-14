@@ -10,6 +10,7 @@ import { HTTPException } from "hono/http-exception";
 import { compress } from "hono/compress";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
+import { isbot } from "isbot";
 import { createRequestHandler, type ServerBuild } from "react-router";
 
 import { publicUrl } from "./app/shared/lib/public-url";
@@ -115,11 +116,25 @@ function withForwardedProto(request: Request, forwardedProto: string | undefined
   return new Request(url, request);
 }
 
-app.all("*", (c) => {
-  const clientIp = getConnInfo(c).remote.address;
-  const request = withForwardedProto(c.req.raw, c.req.header("x-forwarded-proto"));
+// Robôs de cartão de link (WhatsApp, Telegram…) não seguem o redirecionamento de quem não
+// está logado para /login: o cartão saía só com o domínio. Para eles, o login é servido
+// direto (200) no endereço pedido, com as tags de compartilhamento do layout.
+function isLoginRedirect(response: Response): boolean {
+  return response.status >= 300 && response.status < 400 && response.headers.get("location") === "/login";
+}
 
-  return handleRequest(request, clientIp === undefined ? {} : { clientIp });
+app.all("*", async (c) => {
+  const clientIp = getConnInfo(c).remote.address;
+  const context = clientIp === undefined ? {} : { clientIp };
+  const request = withForwardedProto(c.req.raw, c.req.header("x-forwarded-proto"));
+  const response = await handleRequest(request, context);
+  const userAgent = c.req.header("user-agent");
+
+  if (request.method !== "GET" || userAgent === undefined || !isbot(userAgent) || !isLoginRedirect(response)) {
+    return response;
+  }
+
+  return handleRequest(new Request(new URL("/login", request.url), { headers: request.headers }), context);
 });
 
 // Recusas dos middlewares (CSRF 403, corpo grande demais 413) chegam como HTTPException.

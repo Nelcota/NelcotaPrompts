@@ -1,60 +1,80 @@
 import { eq } from "drizzle-orm";
 
+import type { BrandAsset } from "~/features/brand/brand-rules";
 import { getDb } from "~/shared/server/db.server";
 import { siteAssets } from "~/shared/server/db/schema";
 import type { ImageType } from "~/shared/server/image.server";
 import { type StoredImage, versionedUrl } from "~/shared/server/stored-image.server";
 
-// Logo da navbar (tabela site_assets). O root loader roda em toda navegação, então a
-// versão fica em memória (uma instância só) e é atualizada aqui quando o painel troca a logo.
-const LOGO_KEY = "logo";
+// Logo da navbar e favicon (tabela site_assets, uma linha por imagem). O root loader roda em
+// toda navegação, então a versão fica em memória (uma instância só) e é atualizada aqui
+// quando o painel troca a imagem.
+
+type AssetCache = {
+  // undefined = ainda não consultado; null = sem imagem personalizada.
+  updatedAt: Date | null | undefined;
+  // Conta trocas: uma leitura que começou antes de uma troca não sobrescreve o valor novo
+  // com o antigo.
+  generation: number;
+};
 
 declare global {
-  // undefined = ainda não consultado; null = sem logo personalizada.
-  var __nelcotaLogoUpdatedAt: Date | null | undefined;
-  // Conta trocas da logo: uma leitura que começou antes de uma troca não sobrescreve o
-  // valor novo com o antigo.
-  var __nelcotaLogoGeneration: number | undefined;
+  var __nelcotaBrandAssets: Map<BrandAsset, AssetCache> | undefined;
 }
 
-function bumpGeneration(updatedAt: Date | null) {
-  globalThis.__nelcotaLogoGeneration = (globalThis.__nelcotaLogoGeneration ?? 0) + 1;
-  globalThis.__nelcotaLogoUpdatedAt = updatedAt;
+function cacheOf(asset: BrandAsset): AssetCache {
+  globalThis.__nelcotaBrandAssets ??= new Map();
+  let cache = globalThis.__nelcotaBrandAssets.get(asset);
+
+  if (cache === undefined) {
+    cache = { updatedAt: undefined, generation: 0 };
+    globalThis.__nelcotaBrandAssets.set(asset, cache);
+  }
+
+  return cache;
 }
 
-export async function getLogoUrl(): Promise<string | null> {
-  if (globalThis.__nelcotaLogoUpdatedAt === undefined) {
-    const generation = globalThis.__nelcotaLogoGeneration ?? 0;
-    const [row] = await getDb().select({ updatedAt: siteAssets.updatedAt }).from(siteAssets).where(eq(siteAssets.key, LOGO_KEY));
+function bumpGeneration(asset: BrandAsset, updatedAt: Date | null) {
+  const cache = cacheOf(asset);
+  cache.generation += 1;
+  cache.updatedAt = updatedAt;
+}
 
-    if ((globalThis.__nelcotaLogoGeneration ?? 0) === generation && globalThis.__nelcotaLogoUpdatedAt === undefined) {
-      globalThis.__nelcotaLogoUpdatedAt = row?.updatedAt ?? null;
+export async function getBrandAssetUrl(asset: BrandAsset): Promise<string | null> {
+  const cache = cacheOf(asset);
+
+  if (cache.updatedAt === undefined) {
+    const generation = cache.generation;
+    const [row] = await getDb().select({ updatedAt: siteAssets.updatedAt }).from(siteAssets).where(eq(siteAssets.key, asset));
+
+    if (cache.generation === generation && cache.updatedAt === undefined) {
+      cache.updatedAt = row?.updatedAt ?? null;
     }
   }
 
-  return versionedUrl("/marca/logo", globalThis.__nelcotaLogoUpdatedAt ?? null);
+  return versionedUrl(`/marca/${asset}`, cache.updatedAt ?? null);
 }
 
-export async function saveLogo(type: ImageType, bytes: Uint8Array) {
+export async function saveBrandAsset(asset: BrandAsset, type: ImageType, bytes: Uint8Array) {
   const values = { contentType: type, data: bytes, byteSize: bytes.byteLength, updatedAt: new Date() };
   const [row] = await getDb()
     .insert(siteAssets)
-    .values({ key: LOGO_KEY, ...values })
+    .values({ key: asset, ...values })
     .onConflictDoUpdate({ target: siteAssets.key, set: values })
     .returning({ updatedAt: siteAssets.updatedAt });
-  bumpGeneration(row?.updatedAt ?? null);
+  bumpGeneration(asset, row?.updatedAt ?? null);
 }
 
-export async function deleteLogo() {
-  await getDb().delete(siteAssets).where(eq(siteAssets.key, LOGO_KEY));
-  bumpGeneration(null);
+export async function deleteBrandAsset(asset: BrandAsset) {
+  await getDb().delete(siteAssets).where(eq(siteAssets.key, asset));
+  bumpGeneration(asset, null);
 }
 
-export async function loadLogo(): Promise<StoredImage | null> {
+export async function loadBrandAsset(asset: BrandAsset): Promise<StoredImage | null> {
   const [row] = await getDb()
     .select({ contentType: siteAssets.contentType, data: siteAssets.data, updatedAt: siteAssets.updatedAt })
     .from(siteAssets)
-    .where(eq(siteAssets.key, LOGO_KEY));
+    .where(eq(siteAssets.key, asset));
 
   return row ?? null;
 }

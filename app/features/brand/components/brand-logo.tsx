@@ -3,17 +3,24 @@ import { useRouteLoaderData } from "react-router";
 import { Mascot } from "~/shared/ui/mascot";
 import { cn } from "~/shared/ui/cn";
 
-function readLogoUrl(value: unknown): string | null {
-  if (typeof value !== "object" || value === null || !("logoUrl" in value)) {
+function readUrl(value: unknown, key: "logoUrl" | "faviconUrl"): string | null {
+  if (typeof value !== "object" || value === null || !(key in value)) {
     return null;
   }
 
-  return typeof value.logoUrl === "string" ? value.logoUrl : null;
+  const url: unknown = Reflect.get(value, key);
+
+  return typeof url === "string" ? url : null;
 }
 
 // URL da logo enviada pelo painel admin (vem do root loader); null = logo padrão.
 export function useLogoUrl(): string | null {
-  return readLogoUrl(useRouteLoaderData("root"));
+  return readUrl(useRouteLoaderData("root"), "logoUrl");
+}
+
+// URL do favicon enviado pelo painel admin; null = favicon padrão (mascote).
+export function useFaviconUrl(): string | null {
+  return readUrl(useRouteLoaderData("root"), "faviconUrl");
 }
 
 type BrandLogoProps = {

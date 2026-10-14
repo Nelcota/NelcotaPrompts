@@ -27,6 +27,8 @@ export const ADMIN_INTENTS = [
   "invite-reset",
   "logo-upload",
   "logo-remove",
+  "favicon-upload",
+  "favicon-remove",
 ] as const;
 
 export type AdminIntent = (typeof ADMIN_INTENTS)[number];

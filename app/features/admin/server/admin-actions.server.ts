@@ -12,9 +12,9 @@ import {
   setUserDisabled,
 } from "./admin.server";
 import { type AdminIntent, inviteCodeSchema } from "~/features/admin/admin-rules";
-import { deleteLogo, saveLogo } from "~/features/brand/server/brand.server";
-import { MAX_LOGO_BYTES, MAX_LOGO_DIMENSION } from "~/features/brand/brand-rules";
-import { readUploadedImage, type UploadedImage } from "~/shared/server/image.server";
+import { deleteBrandAsset, saveBrandAsset } from "~/features/brand/server/brand.server";
+import { type BrandAsset, MAX_BRAND_IMAGE_BYTES, MAX_BRAND_IMAGE_DIMENSION } from "~/features/brand/brand-rules";
+import { readUploadedImage, type UploadedImage, type UploadLimits } from "~/shared/server/image.server";
 import type { IntentHandler } from "~/shared/server/intent-dispatch.server";
 import { createResetLink } from "~/features/auth/server/password-reset.server";
 import { currentSessionId, destroyUserSessions } from "~/features/auth/server/session.server";
@@ -50,16 +50,53 @@ function readToggle(form: FormData): boolean | null {
   return value === "1" ? true : value === "0" ? false : null;
 }
 
-// A logo aparece com 40 px de altura: guardada com folga para telas de alta densidade.
-const LOGO_LIMITS = { maxBytes: MAX_LOGO_BYTES, maxDimension: MAX_LOGO_DIMENSION, output: { width: 1024, height: 256 } };
+const BRAND_UPLOAD = { maxBytes: MAX_BRAND_IMAGE_BYTES, maxDimension: MAX_BRAND_IMAGE_DIMENSION };
 
-const LOGO_ERRORS: Record<Exclude<UploadedImage, { ok: true }>["reason"], string> = {
+// A logo aparece com 40 px de altura: guardada com folga para telas de alta densidade. O
+// favicon sai quadrado (aba, favoritos e atalhos pedem de 16 a 192 px).
+const BRAND_LIMITS: Record<BrandAsset, UploadLimits> = {
+  logo: { ...BRAND_UPLOAD, output: { width: 1024, height: 256 } },
+  favicon: { ...BRAND_UPLOAD, output: { width: 256, height: 256, fit: "square" } },
+};
+
+const BRAND_MESSAGES: Record<BrandAsset, { saved: string; removed: string }> = {
+  logo: { saved: "Logo atualizada.", removed: "Voltou a logo padrão." },
+  favicon: { saved: "Favicon atualizado.", removed: "Voltou o favicon padrão." },
+};
+
+const IMAGE_ERRORS: Record<Exclude<UploadedImage, { ok: true }>["reason"], string> = {
   missing: "Escolha uma imagem.",
   too_large: "A imagem passa de 1 MB.",
   unsupported: "Formato não suportado. Use PNG, WebP ou JPG.",
-  dimensions: `A imagem passa de ${MAX_LOGO_DIMENSION} px.`,
+  dimensions: `A imagem passa de ${MAX_BRAND_IMAGE_DIMENSION} px.`,
   corrupt: "Essa imagem parece corrompida. Tente outra.",
 };
+
+function brandUpload(asset: BrandAsset): IntentHandler<Context, Extra> {
+  const intent = `${asset}-upload` satisfies AdminIntent;
+
+  return async (form) => {
+    const image = await readUploadedImage(form, asset, BRAND_LIMITS[asset]);
+
+    if (!image.ok) {
+      return reply(intent, image.status, IMAGE_ERRORS[image.reason]);
+    }
+
+    await saveBrandAsset(asset, image.type, image.bytes);
+
+    return reply(intent, 200, BRAND_MESSAGES[asset].saved);
+  };
+}
+
+function brandRemove(asset: BrandAsset): IntentHandler<Context, Extra> {
+  const intent = `${asset}-remove` satisfies AdminIntent;
+
+  return async () => {
+    await deleteBrandAsset(asset);
+
+    return reply(intent, 200, BRAND_MESSAGES[asset].removed);
+  };
+}
 
 // Ações sobre um prompt por id: id malformado = 400; não encontrado = 404.
 function promptAction(intent: AdminIntent, run: (id: string, context: Context) => Promise<boolean>, message: string): IntentHandler<Context, Extra> {
@@ -219,24 +256,11 @@ export const ADMIN_HANDLERS: Record<AdminIntent, IntentHandler<Context, Extra>> 
     return reply("invite-reset", 200, "Voltou a valer o código da variável INVITE_CODE.");
   },
 
-  async "logo-upload"(form) {
-    const image = await readUploadedImage(form, "logo", LOGO_LIMITS);
-
-    if (!image.ok) {
-      return reply("logo-upload", image.status, LOGO_ERRORS[image.reason]);
-    }
-
-    await saveLogo(image.type, image.bytes);
-
-    return reply("logo-upload", 200, "Logo atualizada.");
-  },
-
-  async "logo-remove"() {
-    await deleteLogo();
-
-    return reply("logo-remove", 200, "Voltou a logo padrão.");
-  },
+  "logo-upload": brandUpload("logo"),
+  "logo-remove": brandRemove("logo"),
+  "favicon-upload": brandUpload("favicon"),
+  "favicon-remove": brandRemove("favicon"),
 };
 
-// Folga para os outros campos do formulário além da logo.
-export const ADMIN_MAX_REQUEST_BYTES = MAX_LOGO_BYTES + 64 * 1024;
+// Folga para os outros campos do formulário além da imagem.
+export const ADMIN_MAX_REQUEST_BYTES = MAX_BRAND_IMAGE_BYTES + 64 * 1024;

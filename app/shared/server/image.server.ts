@@ -1,6 +1,6 @@
 import sharp, { type Metadata } from "sharp";
 
-// Imagens enviadas (foto de perfil, logo) são decodificadas e geradas de novo com sharp:
+// Imagens enviadas (foto de perfil, logo, favicon) são decodificadas e geradas de novo com sharp:
 // o arquivo salvo nunca é o enviado. Isso descarta metadados (EXIF/GPS) e qualquer coisa
 // escondida no arquivo (ex.: um "poliglota" que é imagem e script ao mesmo tempo).
 // Só JPEG, PNG e WebP entram; SVG fica de fora porque pode carregar script.
@@ -14,8 +14,10 @@ export type UploadLimits = {
   maxBytes: number;
   // Lado maior da imagem enviada (protege contra "bombas" de pixels).
   maxDimension: number;
-  // Tamanho máximo da imagem salva (reduz mantendo a proporção; nunca amplia).
-  output: { width: number; height: number };
+  // Tamanho da imagem salva. "inside" (padrão): reduz mantendo a proporção, nunca amplia.
+  // "square": sai exatamente width × height, a imagem inteira centralizada com fundo
+  // transparente (favicon).
+  output: { width: number; height: number; fit?: "inside" | "square" };
 };
 
 export type UploadedImage =
@@ -56,7 +58,11 @@ export async function readUploadedImage(form: FormData, field: string, limits: U
     const output = await sharp(input, options)
       // Aplica a orientação do EXIF antes de descartá-lo (foto de celular não fica deitada).
       .autoOrient()
-      .resize({ width: limits.output.width, height: limits.output.height, fit: "inside", withoutEnlargement: true })
+      .resize(
+        limits.output.fit === "square"
+          ? { width: limits.output.width, height: limits.output.height, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }
+          : { width: limits.output.width, height: limits.output.height, fit: "inside", withoutEnlargement: true },
+      )
       // WebP mantém a transparência (foto em círculo, logo sem fundo) com arquivo pequeno.
       .webp({ quality: 90, alphaQuality: 100 })
       .toBuffer();

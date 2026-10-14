@@ -23,7 +23,7 @@ import appleTouchIconUrl from "~/assets/mascot/apple-touch-icon.png";
 import faviconUrl from "~/assets/mascot/favicon.png";
 
 import { getTheme } from "~/features/theme/server/theme.server";
-import { getLogoUrl } from "~/features/brand/server/brand.server";
+import { getBrandAssetUrl } from "~/features/brand/server/brand.server";
 import { useTheme } from "~/features/theme/theme";
 import { publicUrl } from "~/shared/lib/public-url";
 import type { Route } from "./+types/root";
@@ -37,7 +37,9 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {
-  return { theme: await getTheme(request), logoUrl: await getLogoUrl(), siteUrl: publicUrl() ?? new URL(request.url).origin };
+  const [theme, logoUrl, customFaviconUrl] = await Promise.all([getTheme(request), getBrandAssetUrl("logo"), getBrandAssetUrl("favicon")]);
+
+  return { theme, logoUrl, faviconUrl: customFaviconUrl, siteUrl: publicUrl() ?? new URL(request.url).origin };
 }
 
 const SITE_NAME = "Nelcota Prompts";
@@ -84,7 +86,10 @@ export function shouldRevalidate({ currentUrl, nextUrl, formMethod, defaultShoul
 export function Layout({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   // Sem dados (erro antes do loader raiz): a página sai sem o cartão de link.
-  const siteUrl = useRouteLoaderData<typeof loader>("root")?.siteUrl;
+  const rootData = useRouteLoaderData<typeof loader>("root");
+  const siteUrl = rootData?.siteUrl;
+  // Favicon enviado pelo painel admin (WebP quadrado) ou, sem ele, o mascote.
+  const customFavicon = rootData?.faviconUrl ?? null;
 
   return (
     <html lang="pt-BR" className={theme === "dark" ? "dark" : ""}>
@@ -94,7 +99,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="color-scheme" content={theme} />
         <meta name="theme-color" content={theme === "dark" ? "#050505" : "#f3f0ea"} />
         {siteUrl === undefined ? null : <ShareTags siteUrl={siteUrl} />}
-        <link rel="icon" type="image/png" href={faviconUrl} />
+        {customFavicon === null ? (
+          <link rel="icon" type="image/png" href={faviconUrl} />
+        ) : (
+          <link rel="icon" type="image/webp" href={customFavicon} />
+        )}
         <link rel="apple-touch-icon" href={appleTouchIconUrl} />
         <Meta />
         <Links />

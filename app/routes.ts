@@ -15,6 +15,6 @@ export default [
   route("redefinir-senha", "routes/reset-password.tsx"),
   route("avatar/:userId", "routes/avatar.tsx"),
   route("admin", "routes/admin.tsx"),
-  route("marca/logo", "routes/brand-logo.tsx"),
+  route("marca/:asset", "routes/brand-asset.tsx"),
   route("health", "routes/health.tsx"),
 ] satisfies RouteConfig;

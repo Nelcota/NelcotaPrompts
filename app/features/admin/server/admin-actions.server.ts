@@ -72,7 +72,9 @@ const IMAGE_ERRORS: Record<Exclude<UploadedImage, { ok: true }>["reason"], strin
   corrupt: "Essa imagem parece corrompida. Tente outra.",
 };
 
-function brandUpload(asset: BrandAsset, intent: AdminIntent): IntentHandler<Context, Extra> {
+function brandUpload(asset: BrandAsset): IntentHandler<Context, Extra> {
+  const intent = `${asset}-upload` satisfies AdminIntent;
+
   return async (form) => {
     const image = await readUploadedImage(form, asset, BRAND_LIMITS[asset]);
 
@@ -86,7 +88,9 @@ function brandUpload(asset: BrandAsset, intent: AdminIntent): IntentHandler<Cont
   };
 }
 
-function brandRemove(asset: BrandAsset, intent: AdminIntent): IntentHandler<Context, Extra> {
+function brandRemove(asset: BrandAsset): IntentHandler<Context, Extra> {
+  const intent = `${asset}-remove` satisfies AdminIntent;
+
   return async () => {
     await deleteBrandAsset(asset);
 
@@ -252,10 +256,10 @@ export const ADMIN_HANDLERS: Record<AdminIntent, IntentHandler<Context, Extra>> 
     return reply("invite-reset", 200, "Voltou a valer o código da variável INVITE_CODE.");
   },
 
-  "logo-upload": brandUpload("logo", "logo-upload"),
-  "logo-remove": brandRemove("logo", "logo-remove"),
-  "favicon-upload": brandUpload("favicon", "favicon-upload"),
-  "favicon-remove": brandRemove("favicon", "favicon-remove"),
+  "logo-upload": brandUpload("logo"),
+  "logo-remove": brandRemove("logo"),
+  "favicon-upload": brandUpload("favicon"),
+  "favicon-remove": brandRemove("favicon"),
 };
 
 // Folga para os outros campos do formulário além da imagem.

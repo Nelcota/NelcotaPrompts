@@ -8,6 +8,7 @@ import { type BrandAsset, MAX_BRAND_IMAGE_BYTES } from "~/features/brand/brand-r
 import { BrandWordmark, useFaviconUrl, useLogoUrl } from "~/features/brand/components/brand-logo";
 import { buttonClass } from "~/shared/ui/styles";
 import { Section } from "./admin-ui";
+import type { AdminIntent } from "~/features/admin/admin-rules";
 import { useAdminAction } from "~/features/admin/hooks/use-admin-action";
 import { cn } from "~/shared/ui/cn";
 
@@ -51,18 +52,20 @@ type BrandImageFormProps = {
   // Imagem atual enviada pelo painel; null = padrão.
   currentUrl: string | null;
   label: string;
+  // Rótulo do campo de arquivo para leitores de tela (com o gênero certo).
+  fileLabel: string;
   // Prévia (mostrada nos dois temas) com a imagem escolhida, ainda não salva, ou null para a atual.
   preview: (previewUrl: string | null) => ReactNode;
   statusText: { custom: string; fallback: string };
 };
 
 // Escolher, pré-visualizar, salvar e voltar ao padrão: o mesmo fluxo para logo e favicon.
-function BrandImageForm({ asset, currentUrl, label, preview, statusText }: BrandImageFormProps) {
+function BrandImageForm({ asset, currentUrl, label, fileLabel, preview, statusText }: BrandImageFormProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const previewUrl = useObjectUrl(file);
-  const uploadIntent = asset === "logo" ? "logo-upload" : "favicon-upload";
-  const removeIntent = asset === "logo" ? "logo-remove" : "favicon-remove";
+  const uploadIntent = `${asset}-upload` satisfies AdminIntent;
+  const removeIntent = `${asset}-remove` satisfies AdminIntent;
   const { fetcher, busy, submit } = useAdminAction((result) => {
     // Enviada: a prévia some e o site já mostra a imagem nova.
     if (result.intent === uploadIntent) {
@@ -94,7 +97,7 @@ function BrandImageForm({ asset, currentUrl, label, preview, statusText }: Brand
           type="file"
           name={asset}
           accept="image/png,image/webp,image/jpeg"
-          aria-label={`Arquivo do ${label}`}
+          aria-label={fileLabel}
           onChange={(event) => {
             const chosen = event.target.files?.[0] ?? null;
 
@@ -139,6 +142,7 @@ export function BrandTab() {
           asset="logo"
           currentUrl={logoUrl}
           label="logo"
+          fileLabel="Arquivo da logo"
           preview={(previewUrl) => <NavbarPreview previewUrl={previewUrl} />}
           statusText={{ custom: "Usando a logo enviada.", fallback: "Usando a logo padrão (mascote)." }}
         />
@@ -151,6 +155,7 @@ export function BrandTab() {
           asset="favicon"
           currentUrl={faviconUrl}
           label="favicon"
+          fileLabel="Arquivo do favicon"
           preview={(previewUrl) => <BrowserTabPreview iconUrl={previewUrl ?? faviconUrl ?? defaultFaviconUrl} />}
           statusText={{ custom: "Usando o favicon enviado.", fallback: "Usando o favicon padrão (mascote)." }}
         />

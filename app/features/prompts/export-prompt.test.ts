@@ -7,11 +7,11 @@ describe("exportar prompt", () => {
     expect(promptFileName("Revisão: código")).toBe("revisao-codigo.md");
   });
 
-  test("variáveis viram argumentos posicionais, repetidas com o mesmo número", () => {
+  test("variáveis viram argumentos posicionais (repetidas com o mesmo número) e os padrões vão antes do texto", () => {
     const command = toClaudeCommand("Debug: stack", "Erro em {linguagem=Go}.\n\n{trace}\n\nDe novo {linguagem}.");
 
     expect(command).toBe(
-      '---\ndescription: "Debug: stack"\nargument-hint: "[linguagem=Go] [trace]"\n---\n\nErro em $1.\n\n$2\n\nDe novo $1.\n',
+      '---\ndescription: "Debug: stack"\nargument-hint: "[linguagem=Go] [trace]"\n---\n\nSe algum argumento vier vazio, use o padrão: $1 (linguagem) = Go.\n\nErro em $1.\n\n$2\n\nDe novo $1.\n',
     );
   });
 

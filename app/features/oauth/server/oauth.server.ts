@@ -79,6 +79,31 @@ export function isAllowedRedirectUri(raw: string): boolean {
   return true;
 }
 
+// Retorno pedido confere com o registrado: igual, ou, no loopback, igual a menos da porta
+// (RFC 8252 §7.3: apps de terminal abrem uma porta livre a cada login).
+export function redirectMatches(registered: string, requested: string): boolean {
+  if (registered === requested) {
+    return true;
+  }
+
+  try {
+    const a = new URL(registered);
+    const b = new URL(requested);
+
+    return (
+      a.protocol === "http:" &&
+      b.protocol === "http:" &&
+      LOOPBACK_HOSTS.has(a.hostname) &&
+      a.hostname === b.hostname &&
+      a.pathname === b.pathname &&
+      a.search === b.search &&
+      b.hash === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
 type RegisterInput = { name: unknown; redirectUris: unknown };
 type RegisterResult = { ok: true; clientId: string; name: string; redirectUris: string[] } | { ok: false; message: string };
 
@@ -132,9 +157,10 @@ export type AuthorizeRequest = {
   wantsWrite: boolean;
 };
 
-// Erro sem retorno confiável: mostrado na tela, nunca redirecionado (evita usar o app
-// como redirecionador aberto).
-export type AuthorizeCheck = { ok: true; request: AuthorizeRequest } | { ok: false; message: string; redirect?: string };
+// Pedido inválido: o erro é mostrado na tela, nunca redirecionado. Como qualquer um pode
+// registrar um cliente (com o retorno que quiser), redirecionar o erro sem a pessoa clicar
+// em nada transformaria o /oauth/autorizar num redirecionador aberto.
+export type AuthorizeCheck = { ok: true; request: AuthorizeRequest } | { ok: false; message: string };
 
 // Redireciona de volta ao cliente com o resultado (code ou error) e o state.
 export function redirectBack(redirectUri: string, params: Record<string, string>, state: string | null): string {
@@ -160,22 +186,17 @@ export async function checkAuthorizeRequest(params: URLSearchParams): Promise<Au
 
   const redirectUri = params.get("redirect_uri") ?? (client.redirectUris.length === 1 ? client.redirectUris[0] : undefined);
 
-  if (redirectUri === undefined || !client.redirectUris.includes(redirectUri)) {
+  if (redirectUri === undefined || !client.redirectUris.some((registered) => redirectMatches(registered, redirectUri))) {
     return { ok: false, message: "O endereço de retorno não confere com o que o app registrou." };
-  }
-
-  const state = params.get("state");
-  const fail = (error: string) => ({ ok: false as const, message: "Pedido de autorização inválido.", redirect: redirectBack(redirectUri, { error }, state) });
-
-  if (params.get("response_type") !== "code") {
-    return fail("unsupported_response_type");
   }
 
   const codeChallenge = params.get("code_challenge") ?? "";
 
-  if (params.get("code_challenge_method") !== "S256" || !CHALLENGE_PATTERN.test(codeChallenge)) {
-    return fail("invalid_request");
+  if (params.get("response_type") !== "code" || params.get("code_challenge_method") !== "S256" || !CHALLENGE_PATTERN.test(codeChallenge)) {
+    return { ok: false, message: "Pedido de autorização inválido. Atualize o app de IA e tente conectar de novo." };
   }
+
+  const state = params.get("state");
 
   const scopes = (params.get("scope") ?? "").split(" ").filter((scope) => scope !== "");
   const wantsWrite = scopes.length === 0 || scopes.includes(SCOPES.write);
@@ -185,8 +206,11 @@ export async function checkAuthorizeRequest(params: URLSearchParams): Promise<Au
 
 export async function createAuthorizationCode(request: AuthorizeRequest, userId: string, access: TokenAccess): Promise<string> {
   const code = randomBytes(32).toString("base64url");
+  const db = getDb();
 
-  await getDb()
+  // Cada código novo leva junto os vencidos (não há agendador).
+  await db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, sql`now()`));
+  await db
     .insert(oauthCodes)
     .values({
       codeHash: hashSecret(code),

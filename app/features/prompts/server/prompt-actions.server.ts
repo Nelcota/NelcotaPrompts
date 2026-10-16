@@ -26,7 +26,8 @@ const COPY_DEDUP_MS = 10 * 60 * 1000;
 const NOT_FOUND = "Esse prompt não existe mais.";
 const INVALID = "Prompt inválido.";
 
-const OWNERSHIP_ERRORS: Record<Exclude<OwnershipResult, "ok">, { status: number; message: string }> = {
+// Também usadas pelo servidor MCP.
+export const OWNERSHIP_ERRORS: Record<Exclude<OwnershipResult, "ok">, { status: number; message: string }> = {
   not_found: { status: 404, message: NOT_FOUND },
   forbidden: { status: 403, message: "Você só pode alterar os prompts que você criou." },
 };
@@ -63,6 +64,19 @@ export async function countCopy(userId: string, promptId: string): Promise<boole
   }
 
   return true;
+}
+
+// Manda para a lixeira (site e MCP). Sem agendador: cada exclusão aproveita para tirar da
+// lixeira o que passou do prazo. É limpeza de fundo: se falhar, não muda o resultado (o
+// prompt já foi para a lixeira).
+export async function trashAndPurge(promptId: string, userId: string): Promise<OwnershipResult> {
+  const result = await trashPrompt(promptId, userId);
+
+  if (result === "ok") {
+    await purgeExpiredTrash().catch((error: unknown) => console.error("Falha ao limpar a lixeira:", error));
+  }
+
+  return result;
 }
 
 export const PROMPT_HANDLERS: Record<PromptIntent, IntentHandler<PublicUser, Extra>> = {
@@ -106,15 +120,7 @@ export const PROMPT_HANDLERS: Record<PromptIntent, IntentHandler<PublicUser, Ext
       return promptReply("delete", 400, INVALID);
     }
 
-    const result = await trashPrompt(id, user.id);
-
-    // Sem agendador: cada exclusão aproveita para tirar da lixeira o que passou do prazo.
-    // É limpeza de fundo: se falhar, não muda a resposta (o prompt já foi para a lixeira).
-    if (result === "ok") {
-      await purgeExpiredTrash().catch((error: unknown) => console.error("Falha ao limpar a lixeira:", error));
-    }
-
-    return ownedResult("delete", result, "Prompt apagado.", id);
+    return ownedResult("delete", await trashAndPurge(id, user.id), "Prompt apagado.", id);
   },
 
   async restore(form, user) {

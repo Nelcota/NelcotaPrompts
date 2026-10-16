@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import type { ApiCaller } from "~/features/api-tokens/server/api-tokens.server";
 import { promptInputSchema, SEARCH_MAX } from "~/features/prompts/prompt-rules";
-import { countCopy } from "~/features/prompts/server/prompt-actions.server";
+import { countCopy, OWNERSHIP_ERRORS, trashAndPurge } from "~/features/prompts/server/prompt-actions.server";
 import {
   createPrompt,
   getPromptBody,
@@ -14,9 +14,7 @@ import {
   listPrompts,
   listTags,
   type OwnershipResult,
-  purgeExpiredTrash,
   restorePrompt,
-  trashPrompt,
   updatePrompt,
 } from "~/features/prompts/server/prompts.server";
 import type { Prompt } from "~/features/prompts/types";
@@ -40,10 +38,8 @@ const INSTRUCTIONS = `Nelcota Prompts é uma biblioteca de prompts compartilhada
 - Ao criar ou editar: título até 120 caracteres, corpo em Markdown até 20.000, até 8 tags (letras, números e hífen).
 - save_prompt cria (sem id) ou edita (com id, só o que muda). Só o autor edita ou apaga um prompt; apagar manda para a lixeira por 7 dias (delete_prompt com undo: true desfaz).`;
 
-const OWNERSHIP_ERRORS: Record<Exclude<OwnershipResult, "ok">, string> = {
-  not_found: "Prompt não encontrado (pode ter sido apagado).",
-  forbidden: "Só o autor pode alterar esse prompt.",
-};
+// Mesmas mensagens do site.
+const NOT_FOUND = OWNERSHIP_ERRORS.not_found.message;
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 
@@ -56,7 +52,7 @@ function fail(message: string): ToolResult {
 }
 
 function ownership(result: OwnershipResult, message: string, id: string): ToolResult {
-  return result === "ok" ? ok({ id, message }) : fail(OWNERSHIP_ERRORS[result]);
+  return result === "ok" ? ok({ id, message }) : fail(OWNERSHIP_ERRORS[result].message);
 }
 
 // O que a lista mostra de cada prompt (sem foto, favorito do card etc.).
@@ -122,9 +118,9 @@ function registerReadTools(server: McpServer, caller: ApiCaller) {
       // As tags (varrem o mural todo) vão só na primeira olhada, sem filtro: é quando a IA
       // ainda não sabe como o mural se organiza.
       const exploring = filters.search === null && filters.tag === null && filters.authorId === null && !filters.favoritesOnly;
-      const [{ prompts, total }, tags] = await Promise.all([listPrompts(viewerId, filters, args.limit ?? 20), exploring ? listTags() : null]);
+      const [{ prompts, total }, tags] = await Promise.all([listPrompts(viewerId, filters, args.limit ?? 20), exploring ? listTags(TAGS_SHOWN) : null]);
 
-      return ok({ total, prompts: prompts.map(summary), ...(tags === null ? {} : { tags: tags.slice(0, TAGS_SHOWN).map((entry) => entry.tag) }) });
+      return ok({ total, prompts: prompts.map(summary), ...(tags === null ? {} : { tags: tags.map((entry) => entry.tag) }) });
     },
   );
 
@@ -144,7 +140,7 @@ function registerReadTools(server: McpServer, caller: ApiCaller) {
       const [prompt, body] = await Promise.all([getPromptById(viewerId, args.id), getPromptBody(args.id)]);
 
       if (prompt === null || body === null) {
-        return fail(OWNERSHIP_ERRORS.not_found);
+        return fail(NOT_FOUND);
       }
 
       // Ler não conta como cópia: a IA lê vários para comparar ou antes de editar, e isso
@@ -192,16 +188,24 @@ function registerWriteTools(server: McpServer, caller: ApiCaller) {
       const [current, body] = await Promise.all([getPromptById(userId, args.id), getPromptBody(args.id)]);
 
       if (current === null || body === null) {
-        return fail(OWNERSHIP_ERRORS.not_found);
+        return fail(NOT_FOUND);
       }
 
+      // Valida com o atual nos campos omitidos, mas grava só os enviados (o resto é
+      // misturado dentro da transação, com a versão daquele momento).
       const input = validateInput({ title: args.title ?? current.title, body: args.body ?? body, tags: args.tags ?? current.tags });
 
       if (!input.ok) {
         return fail(input.message);
       }
 
-      return ownership(await updatePrompt(args.id, userId, input.data), "Prompt atualizado.", args.id);
+      const changes = {
+        ...(args.title === undefined ? {} : { title: input.data.title }),
+        ...(args.body === undefined ? {} : { body: input.data.body }),
+        ...(args.tags === undefined ? {} : { tags: input.data.tags }),
+      };
+
+      return ownership(await updatePrompt(args.id, userId, changes), "Prompt atualizado.", args.id);
     },
   );
 
@@ -218,13 +222,7 @@ function registerWriteTools(server: McpServer, caller: ApiCaller) {
         return ownership(await restorePrompt(args.id, userId), "Prompt restaurado.", args.id);
       }
 
-      const result = await trashPrompt(args.id, userId);
-
-      if (result === "ok") {
-        await purgeExpiredTrash().catch((error: unknown) => console.error("Falha ao limpar a lixeira:", error));
-      }
-
-      return ownership(result, "Prompt apagado (delete_prompt com undo: true desfaz por 7 dias).", args.id);
+      return ownership(await trashAndPurge(args.id, userId), "Prompt apagado (delete_prompt com undo: true desfaz por 7 dias).", args.id);
     },
   );
 }

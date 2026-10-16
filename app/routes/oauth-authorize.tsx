@@ -2,15 +2,20 @@ import { useEffect } from "react";
 import { redirect, useFetcher, useLocation } from "react-router";
 
 import { AuthShell, FormError, SubmitButton } from "~/features/auth/components/auth-shell";
-import { getOptionalUser, requireUser } from "~/features/auth/server/session.server";
+import { getOptionalUser } from "~/features/auth/server/session.server";
 import { checkAuthorizeRequest, createAuthorizationCode, redirectBack } from "~/features/oauth/server/oauth.server";
 import { loginHref } from "~/features/auth/login-redirect";
+import { consumeAttempt, tooManyAttemptsMessage } from "~/shared/server/rate-limit.server";
 import { readForm, readText } from "~/shared/server/validation.server";
 import { buttonClass } from "~/shared/ui/styles";
 import type { Route } from "./+types/oauth-authorize";
 
 // Tela de "Permitir": o app de IA manda a pessoa para cá; ela entra (se ainda não entrou),
 // escolhe o acesso e volta para o app com o código de autorização.
+
+// Cada "Permitir" gera um código: um limite por pessoa segura scripts com a sessão dela.
+const GRANTS_PER_WINDOW = 30;
+const WINDOW_MS = 15 * 60 * 1000;
 
 export function meta() {
   return [{ title: "Conectar app de IA · Nelcota Prompts" }, { name: "robots", content: "noindex" }];
@@ -26,10 +31,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   const check = await checkAuthorizeRequest(url.searchParams);
 
   if (!check.ok) {
-    if (check.redirect !== undefined) {
-      throw redirect(check.redirect);
-    }
-
     return { ok: false as const, message: check.message };
   }
 
@@ -42,11 +43,24 @@ export async function loader({ request }: Route.LoaderArgs) {
 // A resposta traz o endereço de volta; o navegador navega por script (o CSP form-action
 // 'self' barraria um redirecionamento de formulário para fora do site).
 export async function action({ request }: Route.ActionArgs) {
-  const user = await requireUser(request);
-  const check = await checkAuthorizeRequest(new URL(request.url).searchParams);
+  const url = new URL(request.url);
+  const user = await getOptionalUser(request);
+
+  // Sessão que venceu com a tela aberta: entra de novo e volta para cá (não para o mural).
+  if (user === null) {
+    return { redirectTo: loginHref(`${url.pathname}${url.search}`), error: null };
+  }
+
+  const check = await checkAuthorizeRequest(url.searchParams);
 
   if (!check.ok) {
-    return { redirectTo: check.redirect ?? null, error: check.message };
+    return { redirectTo: null, error: check.message };
+  }
+
+  const limit = await consumeAttempt(`oauth-grant:${user.id}`, GRANTS_PER_WINDOW, WINDOW_MS);
+
+  if (limit.limited) {
+    return { redirectTo: null, error: tooManyAttemptsMessage(limit.retryAfterSeconds) };
   }
 
   const form = await readForm(request);

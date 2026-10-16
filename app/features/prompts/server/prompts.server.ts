@@ -129,7 +129,7 @@ export async function getPromptBody(id: string): Promise<string | null> {
 }
 
 // Tags em uso, das mais usadas para as menos (para a IA descobrir como o mural se organiza).
-export async function listTags(): Promise<{ tag: string; count: number }[]> {
+export async function listTags(limit: number): Promise<{ tag: string; count: number }[]> {
   const tag = sql<string>`unnest(${prompts.tags})`.as("tag");
   const tagged = getDb().select({ tag }).from(prompts).where(isLive).as("tagged");
 
@@ -137,14 +137,16 @@ export async function listTags(): Promise<{ tag: string; count: number }[]> {
     .select({ tag: tagged.tag, count: sql<number>`count(*)::int` })
     .from(tagged)
     .groupBy(tagged.tag)
-    .orderBy(desc(sql`count(*)`), tagged.tag);
+    .orderBy(desc(sql`count(*)`), tagged.tag)
+    .limit(limit);
 }
 
-// Prompts vivos com o corpo inteiro, do mais recente ao mais antigo (cada um vira um
-// "prompt" do servidor MCP, com as variáveis como argumentos).
+// Prompts vivos, do mais recente ao mais antigo (cada um vira um "prompt" do servidor MCP,
+// com as variáveis como argumentos). O corpo só vem quando há variáveis para extrair:
+// nos outros ele não serve para nada aqui.
 export function listPromptIndex(limit: number): Promise<{ id: string; title: string; body: string }[]> {
   return getDb()
-    .select({ id: prompts.id, title: prompts.title, body: prompts.body })
+    .select({ id: prompts.id, title: prompts.title, body: sql<string>`case when ${prompts.hasVariables} then ${prompts.body} else '' end` })
     .from(prompts)
     .where(isLive)
     .orderBy(desc(prompts.createdAt), desc(prompts.id))
@@ -200,8 +202,10 @@ function sameTags(a: string[], b: string[]): boolean {
 }
 
 // A versão anterior vai para prompt_versions na mesma transação (salvar sem mudar nada
-// não cria versão) e o histórico fica nas VERSIONS_KEPT mais recentes.
-export async function updatePrompt(promptId: string, userId: string, input: PromptInput): Promise<OwnershipResult> {
+// não cria versão) e o histórico fica nas VERSIONS_KEPT mais recentes. Campo omitido fica
+// como está: a mistura com o atual acontece aqui, com a linha travada, então uma edição
+// parcial (pela IA) não desfaz outra feita ao mesmo tempo.
+export async function updatePrompt(promptId: string, userId: string, changes: Partial<PromptInput>): Promise<OwnershipResult> {
   return getDb().transaction(async (tx): Promise<OwnershipResult> => {
     const [row] = await tx
       .select({ authorId: prompts.authorId, title: prompts.title, body: prompts.body, tags: prompts.tags, updatedAt: prompts.updatedAt })
@@ -216,6 +220,8 @@ export async function updatePrompt(promptId: string, userId: string, input: Prom
     if (row.authorId !== userId) {
       return "forbidden";
     }
+
+    const input: PromptInput = { title: changes.title ?? row.title, body: changes.body ?? row.body, tags: changes.tags ?? row.tags };
 
     if (row.title === input.title && row.body === input.body && sameTags(row.tags, input.tags)) {
       return "ok";

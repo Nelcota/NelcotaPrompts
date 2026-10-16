@@ -35,17 +35,17 @@ async function handle(request: Request): Promise<Response> {
     return jsonRpcError(429, "Muitas requisições. Espere um pouco.", retryAfterHeaders(limit.retryAfterSeconds));
   }
 
+  // Um servidor por requisição, fechado no fim. Com resposta em JSON (não em stream), o
+  // corpo já está pronto quando handleRequest volta, então fechar não corta nada.
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   const server = createMcpServer(caller);
 
-  await server.connect(transport);
-
   try {
-    return await transport.handleRequest(request);
-  } catch (error) {
-    console.error("Falha no MCP:", error);
+    await server.connect(transport);
 
-    return jsonRpcError(500, "Erro interno do servidor.");
+    return await transport.handleRequest(request);
+  } finally {
+    await server.close().catch((error: unknown) => console.error("Falha ao fechar o servidor MCP:", error));
   }
 }
 
@@ -55,6 +55,14 @@ export function loader({ request }: Route.LoaderArgs) {
   return request.method === "OPTIONS" ? corsPreflight() : withCors(new Response(null, { status: 405, headers: { Allow: "POST" } }));
 }
 
+// Qualquer falha (banco, limite, SDK) vira erro JSON-RPC com CORS: um app no navegador
+// veria só um "erro de CORS" opaco num 500 sem esses cabeçalhos.
 export async function action({ request }: Route.ActionArgs) {
-  return withCors(await handle(request));
+  try {
+    return withCors(await handle(request));
+  } catch (error) {
+    console.error("Falha no MCP:", error);
+
+    return withCors(jsonRpcError(500, "Erro interno do servidor."));
+  }
 }

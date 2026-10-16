@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, test } from "bun:test";
 
-import { isAllowedRedirectUri, pkceMatches, redirectBack } from "./oauth.server";
+import { isAllowedRedirectUri, pkceMatches, redirectBack, redirectMatches } from "./oauth.server";
 
 describe("OAuth", () => {
   test("endereços de retorno: https, loopback e esquema de app", () => {
@@ -35,5 +35,23 @@ describe("OAuth", () => {
     expect(url.searchParams.get("x")).toBe("1");
     expect(url.searchParams.get("code")).toBe("abc");
     expect(url.searchParams.get("state")).toBe("s t");
+  });
+});
+
+describe("retorno registrado x pedido", () => {
+  test("igual confere", () => {
+    expect(redirectMatches("https://claude.ai/cb", "https://claude.ai/cb")).toBe(true);
+  });
+
+  test("loopback aceita outra porta (RFC 8252), mesmo caminho", () => {
+    expect(redirectMatches("http://127.0.0.1:53211/callback", "http://127.0.0.1:60001/callback")).toBe(true);
+    expect(redirectMatches("http://localhost:1/cb", "http://localhost:2/cb")).toBe(true);
+    expect(redirectMatches("http://127.0.0.1:1/callback", "http://127.0.0.1:2/outro")).toBe(false);
+    expect(redirectMatches("http://127.0.0.1:1/cb", "http://localhost:1/cb")).toBe(false);
+  });
+
+  test("fora do loopback a porta conta", () => {
+    expect(redirectMatches("https://app.com:443/cb", "https://app.com:8443/cb")).toBe(false);
+    expect(redirectMatches("http://evil.com:1/cb", "http://evil.com:2/cb")).toBe(false);
   });
 });

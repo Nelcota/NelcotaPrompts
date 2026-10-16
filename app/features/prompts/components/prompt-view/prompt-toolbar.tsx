@@ -10,6 +10,7 @@ import type { Prompt, PromptActionData } from "~/features/prompts/types";
 import { CopyButton } from "~/features/prompts/components/copy-button";
 import { FavoriteButton } from "~/features/prompts/components/favorite-button";
 import { iconButtonClass } from "~/shared/ui/styles";
+import { UseInProjectMenu } from "./use-in-project-menu";
 
 const ICON = "size-[18px]";
 const DELETE: PromptIntent = "delete";
@@ -45,7 +46,8 @@ type PromptToolbarProps = {
   onEdit: (prompt: Prompt, body: string) => void;
 };
 
-// Copiar (principal), favoritar, link, histórico; para o autor, editar e apagar.
+// Copiar (principal), favoritar, link, histórico, usar em outro projeto; para o autor,
+// editar e apagar.
 export function PromptToolbar({ prompt, body, isOwner, onShowHistory, onEdit }: PromptToolbarProps) {
   const origin = useOrigin();
 
@@ -77,6 +79,7 @@ export function PromptToolbar({ prompt, body, isOwner, onShowHistory, onEdit }: 
       >
         <History className={ICON} aria-hidden />
       </button>
+      <UseInProjectMenu prompt={prompt} body={body} iconClassName={ICON} />
       {isOwner ? (
         <div className="ml-auto flex gap-2">
           <button

@@ -33,6 +33,7 @@ Write a prompt once, share it with your team, copy it with the blanks already fi
 | **Trash with undo** | Deleting is reversible for 7 days. |
 | **Profile photos** | In-browser editor: crop, zoom, rotate, flip, brightness, contrast, saturation, temperature and presets. |
 | **Admin panel** | Users (reset links, admin role, sessions, block, delete), moderation and trash, invite toggle and code, logo. |
+| **AI access (MCP)** | Connect Claude Code, Claude, Cursor, VS Code, Codex or any MCP client by signing in through the browser: it searches, reads and pulls prompts into other projects, and can create and edit yours. |
 | **Keyboard first** | <kbd>⌘K</kbd> palette · <kbd>/</kbd> search · <kbd>N</kbd> new prompt · <kbd>C</kbd> copy · <kbd>Enter</kbd> open. |
 
 ## Stack
@@ -128,6 +129,25 @@ app/
 
 Dependencies only point one way (`shared` → `profile` · `brand` · `theme` → `auth` → `prompts` → `home` · `admin` → `routes`), and `shared/` never imports a feature.
 
+## AI access (MCP)
+
+The app is also an [MCP](https://modelcontextprotocol.io) server at `/mcp` (Streamable HTTP, stateless), so an AI can use the library on your behalf. Open **account menu → Connect AI** (`/conectar`) and pick your app:
+
+| App | How |
+|---|---|
+| Claude Code | `claude mcp add --scope user --transport http nelcota https://your-host/mcp`, then `/mcp` → nelcota to sign in |
+| Claude (app and web) | Settings → Connectors → Add custom connector, URL `https://your-host/mcp` |
+| Cursor · VS Code | One-click **Add to Cursor** / **Add to VS Code** buttons |
+| Codex · Gemini CLI | Command shown on the page |
+
+No token to copy: the app registers itself (OAuth dynamic client registration), opens the browser, you sign in and choose **Everything** or **Read only**. Under the hood it is OAuth 2.1 with PKCE (S256); the issued token (`nlc_…`) is stored hashed and listed under **Connected**, where you can disconnect it. Apps that can't sign in through the browser can use a token created by hand (**Advanced**) in the `Authorization: Bearer` header.
+
+Four tools keep it simple for the model: `search_prompts` (without filters it also lists the tags in use), `get_prompt` (optionally fills `{variables}`), and, with full access, `save_prompt` (create, or edit only the fields sent) and `delete_prompt` (`undo: true` restores). The 200 most recent prompts are also MCP *prompts* with their variables as arguments, so in Claude Code they become slash commands such as `/mcp__nelcota__code-review-de-pr-31c2175f`.
+
+**Pulling a prompt into a project from the site:** an open prompt has a **Use in another project** button: download it as a Claude Code command (`.claude/commands/<name>.md`, variables become `$1`, `$2`…), download the raw `.md`, or copy a ready-made request for the connected AI.
+
+Tokens act as their owner (authors can only change their own prompts), stop working when the account is blocked, and are rate limited (240 requests per minute each). Admin actions are not exposed.
+
 ## Deployment
 
 The `Dockerfile` builds a Bun-only image (no Node). On start it runs pending migrations, then the server.
@@ -149,6 +169,7 @@ The session cookie is `Secure` in production, so sign-in persists only over HTTP
 - **CSRF**: form submissions are accepted only from the same origin (`Origin` / `Sec-Fetch-Site`).
 - **CSP** with a per-request nonce, HSTS, `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`.
 - **Rate limits** on sign-in, sign-up, password reset, password change and uploads. Behind Cloudflare, `CF-Connecting-IP` is trusted only when the connection really comes from Cloudflare's published ranges.
+- **AI access** (MCP): OAuth 2.1 with PKCE and single-use codes; redirect URIs must be https, loopback or an app scheme. Tokens are stored hashed, scoped to read or full, rate limited and revocable; blocking the account disables them.
 - **Uploads are re-encoded** with sharp: metadata (EXIF/GPS) and anything hidden in the file are dropped; SVG is rejected.
 - **Markdown never renders raw HTML**, and `javascript:` links are blocked.
 - Images are served from the app only to signed-in users (avatars) with a sandboxing CSP.

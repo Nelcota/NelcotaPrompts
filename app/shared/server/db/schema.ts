@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 // Schema do banco para o Drizzle tipar as consultas. A fonte de verdade continua sendo
 // migrations/*.sql (aplicadas por scripts/migrate.ts): ao mudar o banco, escreva a
@@ -144,4 +144,52 @@ export const siteAssets = pgTable("site_assets", {
   data: bytea().notNull(),
   byteSize: integer("byte_size").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Tokens de API pessoais (migration 011), usados pelo servidor MCP. Só o hash fica no banco.
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    access: text().$type<"read" | "write">().notNull(),
+    // Preenchido quando o token veio de OAuth (migration 012); null = criado à mão.
+    clientId: text("client_id").references(() => oauthClients.id, { onDelete: "cascade" }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("api_tokens_user_id_idx").on(table.userId),
+    uniqueIndex("api_tokens_user_client_idx").on(table.userId, table.clientId).where(sql`client_id is not null`),
+  ],
+);
+
+// Clientes OAuth (migration 012), registrados pelo próprio app de IA. Públicos (PKCE).
+export const oauthClients = pgTable("oauth_clients", {
+  id: text().primaryKey(),
+  name: text().notNull(),
+  redirectUris: text("redirect_uris").array().notNull(),
+  // Primeira autorização concluída; null = nunca usado (é limpo depois de um tempo).
+  authorizedAt: timestamp("authorized_at", { withTimezone: true }),
+  ...timestamps,
+});
+
+// Códigos de autorização: uso único e curtos. Só o hash fica no banco.
+export const oauthCodes = pgTable("oauth_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => oauthClients.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  access: text().$type<"read" | "write">().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  ...timestamps,
 });

@@ -9,7 +9,7 @@ import { useArtImage } from "~/shared/ui/prompt-art";
 type AuthShellProps = {
   title: string;
   subtitle: string;
-  footer: { text: string; linkLabel: string; to: string };
+  footer?: { text: string; linkLabel: string; to: string };
   children: React.ReactNode;
 };
 
@@ -67,12 +67,14 @@ export function AuthShell({ title, subtitle, footer, children }: AuthShellProps)
           </h1>
           <p className="mt-3 text-base text-muted">{subtitle}</p>
           <div className="mt-8">{children}</div>
-          <p className="mt-8 text-base text-muted">
-            {footer.text}{" "}
-            <Link to={footer.to} className="font-medium text-ink underline-offset-4 hover:underline">
-              {footer.linkLabel}
-            </Link>
-          </p>
+          {footer === undefined ? null : (
+            <p className="mt-8 text-base text-muted">
+              {footer.text}{" "}
+              <Link to={footer.to} className="font-medium text-ink underline-offset-4 hover:underline">
+                {footer.linkLabel}
+              </Link>
+            </p>
+          )}
         </div>
       </section>
       <Showcase />

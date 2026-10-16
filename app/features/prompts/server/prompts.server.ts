@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, notInArray, or, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, lte, notInArray, or, type SQL, sql } from "drizzle-orm";
 
 import { avatarUrl } from "~/features/profile/server/avatars.server";
 import { getDb, likePattern } from "~/shared/server/db.server";
@@ -126,6 +126,42 @@ export async function getPromptBody(id: string): Promise<string | null> {
     .where(and(eq(prompts.id, id), isLive));
 
   return row?.body ?? null;
+}
+
+// Tags em uso, das mais usadas para as menos (para a IA descobrir como o mural se organiza).
+export async function listTags(): Promise<{ tag: string; count: number }[]> {
+  const tag = sql<string>`unnest(${prompts.tags})`.as("tag");
+  const tagged = getDb().select({ tag }).from(prompts).where(isLive).as("tagged");
+
+  return getDb()
+    .select({ tag: tagged.tag, count: sql<number>`count(*)::int` })
+    .from(tagged)
+    .groupBy(tagged.tag)
+    .orderBy(desc(sql`count(*)`), tagged.tag);
+}
+
+// Prompts vivos com o corpo inteiro, do mais recente ao mais antigo (cada um vira um
+// "prompt" do servidor MCP, com as variáveis como argumentos).
+export function listPromptIndex(limit: number): Promise<{ id: string; title: string; body: string }[]> {
+  return getDb()
+    .select({ id: prompts.id, title: prompts.title, body: prompts.body })
+    .from(prompts)
+    .where(isLive)
+    .orderBy(desc(prompts.createdAt), desc(prompts.id))
+    .limit(limit);
+}
+
+// Prompts vivos cujo id começa com estes 8 dígitos hex (nome dos comandos MCP). Faixa de
+// uuid em vez de LIKE: usa o índice da chave primária.
+export function findPromptsByIdPrefix(prefix: string): Promise<{ id: string; title: string; body: string }[]> {
+  if (!/^[0-9a-f]{8}$/.test(prefix)) {
+    return Promise.resolve([]);
+  }
+
+  return getDb()
+    .select({ id: prompts.id, title: prompts.title, body: prompts.body })
+    .from(prompts)
+    .where(and(isLive, gte(prompts.id, `${prefix}-0000-0000-0000-000000000000`), lte(prompts.id, `${prefix}-ffff-ffff-ffff-ffffffffffff`)));
 }
 
 async function promptIsLive(id: string): Promise<boolean> {

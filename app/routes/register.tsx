@@ -7,6 +7,7 @@ import { getClientIp } from "~/shared/server/client-ip.server";
 import { consumeAttempt, retryAfterHeaders, tooManyAttemptsMessage } from "~/shared/server/rate-limit.server";
 import { createUserSession, getOptionalUser } from "~/features/auth/server/session.server";
 import { getInviteCode, isInviteRequired } from "~/features/auth/server/invite.server";
+import { readRedirectParam, REDIRECT_FIELD, safeRedirectPath, withRedirect } from "~/features/auth/login-redirect";
 import { createUser } from "~/features/auth/server/users.server";
 import { type FieldErrors, parseForm, readForm, readText, UNREADABLE_FORM } from "~/shared/server/validation.server";
 import type { Route } from "./+types/register";
@@ -20,12 +21,13 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getOptionalUser(request);
+  const redirectTo = readRedirectParam(new URL(request.url));
 
   if (user !== null) {
-    throw redirect("/");
+    throw redirect(redirectTo);
   }
 
-  return { inviteRequired: await isInviteRequired() };
+  return { inviteRequired: await isInviteRequired(), redirectTo };
 }
 
 // O código vem do painel admin (ou, sem ele, da variável INVITE_CODE). Com o convite
@@ -90,7 +92,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return data({ errors: { email: "Já existe uma conta com esse email." } satisfies FieldErrors, values }, { status: 409 });
     }
 
-    return await createUserSession(request, result.user.id, "/");
+    return await createUserSession(request, result.user.id, safeRedirectPath(readText(form, REDIRECT_FIELD)));
   } catch (error) {
     console.error("Falha no cadastro:", error);
 
@@ -122,9 +124,10 @@ export default function Register({ loaderData, actionData }: Route.ComponentProp
     <AuthShell
       title="Criar conta"
       subtitle={loaderData.inviteRequired ? "Requer código de convite." : "Leva menos de um minuto."}
-      footer={{ text: "Já tem conta?", linkLabel: "Entrar", to: "/login" }}
+      footer={{ text: "Já tem conta?", linkLabel: "Entrar", to: withRedirect("/login", loaderData.redirectTo) }}
     >
       <Form method="post" className="space-y-4">
+        <input type="hidden" name={REDIRECT_FIELD} value={loaderData.redirectTo} />
         <FormError message={formMessage(errors)} />
         <Field
           label="Nome"

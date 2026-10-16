@@ -1,17 +1,14 @@
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import { and, eq, gt, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 
 import { type Db, getDb } from "~/shared/server/db.server";
 import { passwordResets, users } from "~/shared/server/db/schema";
+import { hashSecret } from "~/shared/server/secret-hash.server";
 import { deleteUserSessions } from "./session-store.server";
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 export const RESET_TTL_MINUTES = 60;
-
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
 
 export function isTokenFormat(token: string): boolean {
   return TOKEN_PATTERN.test(token);
@@ -42,7 +39,7 @@ export async function createResetLink(userId: string, db: Db = getDb()): Promise
       .delete(passwordResets)
       .where(or(eq(passwordResets.userId, userId), isNotNull(passwordResets.usedAt), lt(passwordResets.expiresAt, sql`now()`)));
     await tx.insert(passwordResets).values({
-      tokenHash: hashToken(token),
+      tokenHash: hashSecret(token),
       userId,
       expiresAt: sql`now() + ${`${RESET_TTL_MINUTES} minutes`}::interval`,
     });
@@ -56,7 +53,7 @@ export async function createResetLink(userId: string, db: Db = getDb()): Promise
 // Link ainda válido: não usado, dentro do prazo e de uma conta que não está bloqueada.
 const validToken = (token: string) =>
   and(
-    eq(passwordResets.tokenHash, hashToken(token)),
+    eq(passwordResets.tokenHash, hashSecret(token)),
     isNull(passwordResets.usedAt),
     gt(passwordResets.expiresAt, sql`now()`),
     sql`exists (select 1 from ${users} where ${users.id} = ${passwordResets.userId} and ${users.disabledAt} is null)`,

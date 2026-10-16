@@ -17,4 +17,12 @@ export default [
   route("admin", "routes/admin.tsx"),
   route("marca/:asset", "routes/brand-asset.tsx"),
   route("health", "routes/health.tsx"),
+  route("mcp", "routes/mcp.tsx"),
+  route("conectar", "routes/connect.tsx"),
+  route("oauth/autorizar", "routes/oauth-authorize.tsx"),
+  route("oauth/token", "routes/oauth-token.tsx"),
+  route("oauth/registrar", "routes/oauth-register.tsx"),
+  route(".well-known/oauth-authorization-server", "routes/oauth-metadata.tsx"),
+  route(".well-known/oauth-protected-resource", "routes/oauth-resource.tsx", { id: "oauth-resource" }),
+  route(".well-known/oauth-protected-resource/mcp", "routes/oauth-resource.tsx", { id: "oauth-resource-mcp" }),
 ] satisfies RouteConfig;

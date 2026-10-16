@@ -104,18 +104,22 @@ app.use(
 
 // CSRF (inclusive "login CSRF"): envios de formulário só do próprio site. A Origin é
 // comparada com o Host, e não com a URL interna: o proxy termina o HTTPS antes daqui.
-app.use(
-  csrf({
-    secFetchSite: "same-origin",
-    origin: (origin, c) => {
-      try {
-        return new URL(origin).host === c.req.header("host");
-      } catch {
-        return false;
-      }
-    },
-  }),
-);
+const csrfCheck = csrf({
+  secFetchSite: "same-origin",
+  origin: (origin, c) => {
+    try {
+      return new URL(origin).host === c.req.header("host");
+    } catch {
+      return false;
+    }
+  },
+});
+
+// Fora do CSRF: a troca de código do OAuth chega como formulário vindo do app de IA (de
+// fora do site), e não usa cookie; quem prova a identidade é o PKCE.
+const CSRF_EXEMPT = new Set(["/oauth/token"]);
+
+app.use((c, next) => (CSRF_EXEMPT.has(c.req.path) ? next() : csrfCheck(c, next)));
 
 app.use(bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.text("Arquivo grande demais.", 413) }));
 

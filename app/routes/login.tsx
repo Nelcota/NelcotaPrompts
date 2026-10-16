@@ -6,6 +6,7 @@ import { clearAttempts, consumeAttempt, releaseAttempt, retryAfterHeaders, tooMa
 import { loginSchema } from "~/features/auth/account-rules";
 import { createUserSession, getOptionalUser } from "~/features/auth/server/session.server";
 import { isInviteRequired } from "~/features/auth/server/invite.server";
+import { readRedirectParam, REDIRECT_FIELD, safeRedirectPath } from "~/features/auth/login-redirect";
 import { verifyLogin } from "~/features/auth/server/users.server";
 import { parseForm, readForm, readText, UNREADABLE_FORM } from "~/shared/server/validation.server";
 import type { Route } from "./+types/login";
@@ -20,12 +21,13 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await getOptionalUser(request);
+  const redirectTo = readRedirectParam(new URL(request.url));
 
   if (user !== null) {
-    throw redirect("/");
+    throw redirect(redirectTo);
   }
 
-  return { inviteRequired: await isInviteRequired() };
+  return { inviteRequired: await isInviteRequired(), redirectTo };
 }
 
 function tooMany(retryAfterSeconds: number, email: string) {
@@ -82,7 +84,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     await clearAttempts(emailKey, { max: MAX_FAILURES_PER_EMAIL, windowMs: WINDOW_MS });
     await releaseAttempt(ipKey, { max: MAX_ATTEMPTS_PER_IP, windowMs: WINDOW_MS });
 
-    return await createUserSession(request, user.id, "/");
+    return await createUserSession(request, user.id, safeRedirectPath(readText(form, REDIRECT_FIELD)));
   } catch (error) {
     console.error("Falha no login:", error);
 
@@ -102,6 +104,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
     >
       <Form method="post" className="space-y-4">
         <FormError message={actionData?.error} />
+        <input type="hidden" name={REDIRECT_FIELD} value={loaderData.redirectTo} />
         {/* "username" (e não "email"): é o que os gerenciadores de senha procuram para
             preencher email e senha juntos. */}
         <Field

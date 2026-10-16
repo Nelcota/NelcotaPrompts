@@ -1,0 +1,59 @@
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+
+import { authenticateApiToken, readBearerToken } from "~/features/api-tokens/server/api-tokens.server";
+import { createMcpServer } from "~/features/mcp/server/mcp.server";
+import { appOrigin } from "~/features/oauth/server/oauth.server";
+import { consumeAttempt, retryAfterHeaders } from "~/shared/server/rate-limit.server";
+import type { Route } from "./+types/mcp";
+
+// Rota de recurso: servidor MCP (Streamable HTTP, sem sessão) para IAs usarem o mural.
+// Autentica pelo token de API ("Authorization: Bearer nlc_…"): o app de IA consegue um
+// sozinho pelo OAuth (o 401 aponta onde), ou a pessoa cria um à mão em "Conectar IA".
+
+const REQUESTS_PER_MINUTE = 240;
+
+function jsonRpcError(status: number, message: string, headers?: HeadersInit): Response {
+  return Response.json({ jsonrpc: "2.0", error: { code: -32001, message }, id: null }, { status, headers });
+}
+
+async function handle(request: Request): Promise<Response> {
+  const token = readBearerToken(request);
+  const caller = token === null ? null : await authenticateApiToken(token);
+
+  if (caller === null) {
+    const metadata = `${appOrigin(request)}/.well-known/oauth-protected-resource`;
+
+    return jsonRpcError(401, "Conecte o app pelo navegador (OAuth) ou use um token criado em Conectar IA.", {
+      "WWW-Authenticate": `Bearer resource_metadata="${metadata}"`,
+    });
+  }
+
+  const limit = await consumeAttempt(`mcp:${caller.tokenId}`, REQUESTS_PER_MINUTE, 60_000);
+
+  if (limit.limited) {
+    return jsonRpcError(429, "Muitas requisições. Espere um pouco.", retryAfterHeaders(limit.retryAfterSeconds));
+  }
+
+  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  const server = createMcpServer(caller);
+
+  await server.connect(transport);
+
+  try {
+    return await transport.handleRequest(request);
+  } catch (error) {
+    console.error("Falha no MCP:", error);
+
+    return jsonRpcError(500, "Erro interno do servidor.");
+  }
+}
+
+// Sem sessão não há stream de eventos do servidor para abrir: GET responde 405, como a
+// especificação prevê (o cliente segue só com POST).
+export function loader() {
+  return new Response(null, { status: 405, headers: { Allow: "POST" } });
+}
+
+export function action({ request }: Route.ActionArgs) {
+  return handle(request);
+}

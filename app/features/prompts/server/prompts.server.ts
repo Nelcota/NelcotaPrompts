@@ -128,6 +128,29 @@ export async function getPromptBody(id: string): Promise<string | null> {
   return row?.body ?? null;
 }
 
+// Tags em uso, das mais usadas para as menos (para a IA descobrir como o mural se organiza).
+export async function listTags(): Promise<{ tag: string; count: number }[]> {
+  const tag = sql<string>`unnest(${prompts.tags})`.as("tag");
+  const tagged = getDb().select({ tag }).from(prompts).where(isLive).as("tagged");
+
+  return getDb()
+    .select({ tag: tagged.tag, count: sql<number>`count(*)::int` })
+    .from(tagged)
+    .groupBy(tagged.tag)
+    .orderBy(desc(sql`count(*)`), tagged.tag);
+}
+
+// Prompts vivos com o corpo inteiro, do mais recente ao mais antigo (cada um vira um
+// "prompt" do servidor MCP, com as variáveis como argumentos).
+export function listPromptIndex(limit: number): Promise<{ id: string; title: string; body: string }[]> {
+  return getDb()
+    .select({ id: prompts.id, title: prompts.title, body: prompts.body })
+    .from(prompts)
+    .where(isLive)
+    .orderBy(desc(prompts.createdAt), desc(prompts.id))
+    .limit(limit);
+}
+
 async function promptIsLive(id: string): Promise<boolean> {
   const [row] = await getDb()
     .select({ id: prompts.id })

@@ -32,7 +32,7 @@ const OWNERSHIP_ERRORS: Record<Exclude<OwnershipResult, "ok">, { status: number;
 };
 
 export function promptReply(intent: PromptIntent, status: number, message: string, extra?: Partial<Extra>): Reply {
-  return actionReply<Extra>(intent, status, message, extra as Extra);
+  return actionReply<Extra>(intent, status, message, extra);
 }
 
 // Resposta de uma mudança que exige ser o autor (editar, apagar, restaurar).
@@ -44,6 +44,25 @@ function ownedResult(intent: PromptIntent, result: OwnershipResult, message: str
   const error = OWNERSHIP_ERRORS[result];
 
   return promptReply(intent, error.status, error.message);
+}
+
+// Conta uma cópia (também a de uma IA pelo MCP). A mesma pessoa copiando o mesmo prompt
+// várias vezes seguidas conta uma vez a cada 10 minutos. false = prompt apagado.
+export async function countCopy(userId: string, promptId: string): Promise<boolean> {
+  const key = `copy:${userId}:${promptId}`;
+
+  // Conta antes do await: dois cliques simultâneos não contam duas cópias.
+  if ((await consumeAttempt(key, 1, COPY_DEDUP_MS)).limited) {
+    return true;
+  }
+
+  if (!(await recordCopy(promptId))) {
+    await clearAttempts(key, { max: 1, windowMs: COPY_DEDUP_MS });
+
+    return false;
+  }
+
+  return true;
 }
 
 export const PROMPT_HANDLERS: Record<PromptIntent, IntentHandler<PublicUser, Extra>> = {
@@ -136,8 +155,7 @@ export const PROMPT_HANDLERS: Record<PromptIntent, IntentHandler<PublicUser, Ext
     return promptReply("favorite", 200, favorite ? "Adicionado aos favoritos." : "Removido dos favoritos.", { promptId: id });
   },
 
-  // Conta uma cópia. A mesma pessoa copiando o mesmo prompt várias vezes seguidas
-  // conta uma vez a cada 10 minutos, para o "Mais copiados" não ser inflado.
+  // Conta uma cópia (sem inflar o "Mais copiados": ver countCopy).
   async copied(form, user) {
     const id = readUuid(form, "id");
 
@@ -145,16 +163,7 @@ export const PROMPT_HANDLERS: Record<PromptIntent, IntentHandler<PublicUser, Ext
       return promptReply("copied", 400, INVALID);
     }
 
-    const key = `copy:${user.id}:${id}`;
-
-    // Conta antes do await: dois cliques simultâneos não contam duas cópias.
-    if ((await consumeAttempt(key, 1, COPY_DEDUP_MS)).limited) {
-      return promptReply("copied", 200, "", { promptId: id });
-    }
-
-    if (!(await recordCopy(id))) {
-      await clearAttempts(key, { max: 1, windowMs: COPY_DEDUP_MS });
-
+    if (!(await countCopy(user.id, id))) {
       return promptReply("copied", 404, NOT_FOUND);
     }
 

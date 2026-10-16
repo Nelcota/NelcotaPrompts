@@ -1,5 +1,5 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Camera, FileText, LogOut, ShieldCheck, Star, UserRound } from "lucide-react";
+import { Camera, FileText, LogOut, Plug, ShieldCheck, Star, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Link, useSubmit } from "react-router";
 
@@ -78,6 +78,12 @@ export function UserMenu({ user, query, onEditPhoto, onEditAccount }: UserMenuPr
           <DropdownMenu.Item onSelect={onEditAccount} className={menuItem}>
             <UserRound className={menuIcon} aria-hidden />
             Minha conta
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild className={menuItem}>
+            <Link to="/conectar">
+              <Plug className={menuIcon} aria-hidden />
+              Conectar IA
+            </Link>
           </DropdownMenu.Item>
           {user.isAdmin ? (
             <DropdownMenu.Item asChild className={menuItem}>

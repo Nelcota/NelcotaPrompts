@@ -1,6 +1,6 @@
 import { AdminPanel } from "~/features/admin/components/admin-panel";
 import { ADMIN_HANDLERS, ADMIN_MAX_REQUEST_BYTES } from "~/features/admin/server/admin-actions.server";
-import { getAdminStats, listAdminPrompts, listAdminUsers } from "~/features/admin/server/admin.server";
+import { countTrash, getAdminStats, listAdminPrompts, listAdminUsers } from "~/features/admin/server/admin.server";
 import { ADMIN_TABS, type AdminTab, type AdminTabData } from "~/features/admin/admin-rules";
 import { dispatchIntent } from "~/shared/server/intent-dispatch.server";
 import { purgeExpiredTrash } from "~/features/prompts/server/prompts.server";
@@ -31,9 +31,9 @@ async function loadTab(tab: AdminTab, url: URL): Promise<AdminTabData> {
       // A lixeira mostrada já sem o que passou do prazo.
       await purgeExpiredTrash();
       const search = readSearch(url, SEARCH_MAX);
-      const [prompts, trash] = await Promise.all([listAdminPrompts(search, false), listAdminPrompts(null, true)]);
+      const [prompts, trash, trashTotal] = await Promise.all([listAdminPrompts(search, false), listAdminPrompts(null, true), countTrash()]);
 
-      return { tab, search, prompts, trash };
+      return { tab, search, prompts, trash, trashTotal };
     }
     case "convite":
       return { tab, invite: await getInviteCode(), inviteRequired: await isInviteRequired() };
@@ -43,7 +43,7 @@ async function loadTab(tab: AdminTab, url: URL): Promise<AdminTabData> {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const admin = await requireAdmin(request);
+  const admin = await requireAdmin(request, { returnHere: true });
   const url = new URL(request.url);
 
   return { admin, data: await loadTab(readTab(url), url) };

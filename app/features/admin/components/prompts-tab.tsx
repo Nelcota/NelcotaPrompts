@@ -97,7 +97,8 @@ function EmptyTrashButton({ count, actions: { busy, submit } }: { count: number;
   );
 }
 
-export function PromptsTab({ prompts, trash, search }: { prompts: AdminPrompt[]; trash: AdminPrompt[]; search: string | null }) {
+// trashTotal: a lixeira inteira (a lista mostra no máximo as mais recentes; esvaziar apaga tudo).
+export function PromptsTab({ prompts, trash, trashTotal, search }: { prompts: AdminPrompt[]; trash: AdminPrompt[]; trashTotal: number; search: string | null }) {
   const { busy, submit } = useAdminAction();
   const actions = { busy, submit };
 
@@ -129,7 +130,7 @@ export function PromptsTab({ prompts, trash, search }: { prompts: AdminPrompt[];
       <Section
         title="Lixeira"
         description="Itens apagados há mais de 7 dias são removidos de vez automaticamente."
-        aside={trash.length === 0 ? null : <EmptyTrashButton count={trash.length} actions={actions} />}
+        aside={trash.length === 0 ? null : <EmptyTrashButton count={trashTotal} actions={actions} />}
       >
         {trash.length === 0 ? (
           <p className="text-sm text-muted">A lixeira está vazia.</p>

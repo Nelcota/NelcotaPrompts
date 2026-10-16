@@ -113,15 +113,19 @@ export function readRememberedValues(): Record<string, string> {
   }
 }
 
+// Valor vazio ESQUECE o nome: quem escolheu o padrão (ou apagou o campo) não quer que um
+// valor antigo de outro prompt volte a preencher a variável na próxima cópia.
 export function rememberValues(values: Record<string, string>) {
   const filled = Object.entries(values).filter(([, value]) => value.trim() !== "");
+  const stored = readRememberedValues();
+  const changed = Object.keys(values).some((name) => Object.hasOwn(stored, name) || ownValue(values, name)?.trim() !== "");
 
-  if (filled.length === 0) {
+  if (!changed) {
     return;
   }
 
   // Os usados agora vão para o fim; os mais antigos saem quando passa do limite.
-  const previous = Object.entries(readRememberedValues()).filter(([name]) => !Object.hasOwn(values, name));
+  const previous = Object.entries(stored).filter(([name]) => !Object.hasOwn(values, name));
   const merged = [...previous, ...filled].slice(-REMEMBERED_MAX);
   writeStorage(REMEMBERED_KEY, JSON.stringify(Object.fromEntries(merged)));
 }

@@ -108,6 +108,12 @@ describe("valores lembrados (localStorage)", () => {
     expect(store.has("nelcota:variables")).toBe(false);
   });
 
+  test("valor vazio esquece o lembrado (escolheu o padrão ou apagou o campo)", () => {
+    store.set("nelcota:variables", JSON.stringify({ lang: "Python", outra: "y" }));
+    rememberValues({ lang: "" });
+    expect(readRememberedValues()).toEqual({ outra: "y" });
+  });
+
   test("toString salvo antes não é descartado por existir no protótipo", () => {
     store.set("nelcota:variables", JSON.stringify({ toString: "antigo" }));
     rememberValues({ outra: "x" });

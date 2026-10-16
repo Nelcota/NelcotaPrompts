@@ -192,3 +192,18 @@ dialog::backdrop {
   color: var(--code-comment);
   font-style: italic;
 }
+
+/* Container dos toasts promovido à camada do topo acima dos diálogos (raise-toasts.ts): sem
+   o visual padrão de popover. As listas de toasts dentro dele são position: fixed e
+   continuam presas à tela. */
+section[data-react-aria-top-layer]:popover-open {
+  inset: auto;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  color: inherit;
+  background: transparent;
+}

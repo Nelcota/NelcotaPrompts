@@ -8,10 +8,10 @@ import { iconButtonClass } from "~/shared/ui/styles";
 
 const ACCESS_LABEL = { read: "só leitura", write: "tudo" } as const;
 
-function RevokeButton({ token }: { token: ApiTokenSummary }) {
-  const fetcher = useFetcher<ApiTokenResult>();
+type Revoker = ReturnType<typeof useFetcher<ApiTokenResult>>;
 
-  useFetcherResult(fetcher);
+function RevokeButton({ token, fetcher }: { token: ApiTokenSummary; fetcher: Revoker }) {
+  const busy = fetcher.state !== "idle" && fetcher.formData?.get("id") === token.id;
 
   return (
     <fetcher.Form method="post" action="/conectar">
@@ -19,7 +19,7 @@ function RevokeButton({ token }: { token: ApiTokenSummary }) {
       <input type="hidden" name="id" value={token.id} />
       <button
         type="submit"
-        disabled={fetcher.state !== "idle"}
+        disabled={busy}
         title="Desconectar"
         aria-label={`Desconectar “${token.name}”`}
         className={iconButtonClass({ size: "sm", tone: "danger" })}
@@ -31,7 +31,13 @@ function RevokeButton({ token }: { token: ApiTokenSummary }) {
 }
 
 // Apps conectados pelo navegador e tokens criados à mão, com o botão de desconectar.
+// Um fetcher só, na lista: a linha some quando a lista recarrega, no mesmo instante em que
+// o resultado chega, e um fetcher dentro dela levaria junto o toast ("Acesso removido.").
 export function ConnectedApps({ tokens }: { tokens: ApiTokenSummary[] }) {
+  const revoker = useFetcher<ApiTokenResult>();
+
+  useFetcherResult(revoker);
+
   return (
     <section aria-labelledby="connected-title" className="space-y-4">
       <h2 id="connected-title" className="font-display text-2xl font-light tracking-tight">
@@ -50,7 +56,7 @@ export function ConnectedApps({ tokens }: { tokens: ApiTokenSummary[] }) {
                   {token.lastUsedAt === null ? "nunca usado" : `usado em ${formatDateTime(token.lastUsedAt)}`}
                 </p>
               </div>
-              <RevokeButton token={token} />
+              <RevokeButton token={token} fetcher={revoker} />
             </li>
           ))}
         </ul>

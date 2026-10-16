@@ -171,6 +171,14 @@ export async function deleteUser(userId: string, confirmEmail: string): Promise<
   });
 }
 
+// Total da lixeira: a lista para em ADMIN_LIST_LIMIT, mas "Esvaziar" apaga tudo, e o botão
+// tem que dizer quantos de verdade.
+export async function countTrash(): Promise<number> {
+  const [row] = await getDb().select({ total: count() }).from(prompts).where(isNotNull(prompts.deletedAt));
+
+  return row?.total ?? 0;
+}
+
 // trashed = false: prompts ativos (com busca); true: a lixeira inteira.
 export async function listAdminPrompts(search: string | null, trashed: boolean): Promise<AdminPrompt[]> {
   const pattern = likePattern(search);

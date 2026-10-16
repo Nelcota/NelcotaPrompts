@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { data, Form, redirect, useNavigation } from "react-router";
+import { data, Form, redirect, type ShouldRevalidateFunctionArgs, useNavigation } from "react-router";
 
 import { AuthShell, Field, FormError, SubmitButton } from "~/features/auth/components/auth-shell";
 import { NAME_MAX, PASSWORD_MAX, PASSWORD_MIN, registerSchema } from "~/features/auth/account-rules";
@@ -71,8 +71,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   const errors: FieldErrors = parsed.ok ? {} : { ...parsed.errors };
 
   // O convite (quando o painel exige) é conferido mesmo com outros erros, para a pessoa
-  // ver tudo de uma vez. Se ele foi ligado com a página aberta, o loader recarrega e o
-  // campo aparece junto com o erro.
+  // ver tudo de uma vez. Se ele foi ligado com a página aberta, o loader recarrega (ver
+  // shouldRevalidate) e o campo aparece junto com o erro.
   const invite = readText(form, "invite");
 
   if ((await isInviteRequired()) && (invite === null || !(await sameInvite(invite)))) {
@@ -101,6 +101,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       { status: 500 },
     );
   }
+}
+
+// O React Router não recarrega o loader depois de uma action com erro 4xx. Aqui precisa:
+// se o convite foi ligado com a página aberta, só o loader traz o campo do convite.
+export function shouldRevalidate({ actionStatus, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  return actionStatus === 400 || defaultShouldRevalidate;
 }
 
 function formMessage(errors: FieldErrors): string | undefined {

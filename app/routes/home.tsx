@@ -38,7 +38,7 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireUser(request);
+  const user = await requireUser(request, { returnHere: true });
   const { openId, hasOpenParam, ...parsed } = parseHomeQuery(new URL(request.url));
   // Autor inexistente (link antigo, conta removida): ignora o filtro em vez de mostrar
   // um mural vazio sem como limpar.

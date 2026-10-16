@@ -84,6 +84,6 @@ export type AdminPrompt = {
 export type AdminTabData =
   | { tab: "visao"; stats: AdminStats }
   | { tab: "usuarios"; users: AdminUser[] }
-  | { tab: "prompts"; search: string | null; prompts: AdminPrompt[]; trash: AdminPrompt[] }
+  | { tab: "prompts"; search: string | null; prompts: AdminPrompt[]; trash: AdminPrompt[]; trashTotal: number }
   | { tab: "convite"; invite: InviteCode; inviteRequired: boolean }
   | { tab: "marca" };

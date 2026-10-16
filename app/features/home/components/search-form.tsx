@@ -1,6 +1,6 @@
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useNavigationType } from "react-router";
 
 import { filterHref, type HomeQuery } from "~/features/prompts/list-query";
 import { SEARCH_MAX } from "~/features/prompts/prompt-rules";
@@ -43,6 +43,7 @@ type SearchFormProps = { query: HomeQuery; className: string; onOpenPalette: () 
 export function SearchForm({ query, className, onOpenPalette }: SearchFormProps) {
   const shortcutLabel = usePaletteShortcutLabel();
   const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const [value, setValue] = useState(query.search ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef(0);
@@ -57,18 +58,21 @@ export function SearchForm({ query, className, onOpenPalette }: SearchFormProps)
     queryRef.current = query;
   }, [query]);
 
-  // Se a busca mudou por fora (ex.: "Limpar filtros"), reflete no campo, mas nunca
-  // enquanto a pessoa está digitando nele.
+  // Se a busca mudou por fora (ex.: "Limpar filtros", voltar do navegador), reflete no
+  // campo, mas não por cima do que a pessoa está digitando, a menos que tenha sido o
+  // voltar/avançar (aí o texto antigo no campo mentiria sobre a lista). O que já foi
+  // pedido sempre acompanha a URL: senão o Enter no mesmo texto não buscaria de novo.
   useEffect(() => {
-    if (document.activeElement === inputRef.current) {
+    requestedRef.current = query.search;
+
+    if (document.activeElement === inputRef.current && navigationType !== "POP") {
       return;
     }
 
     // Mudou por fora: um timer pendente traria de volta o texto antigo.
     window.clearTimeout(timerRef.current);
-    requestedRef.current = query.search;
     setValue(query.search ?? "");
-  }, [query.search]);
+  }, [query.search, navigationType]);
 
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
 

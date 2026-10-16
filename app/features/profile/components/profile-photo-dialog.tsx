@@ -1,5 +1,5 @@
 import { ImagePlus, Trash } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
 
@@ -85,6 +85,12 @@ export function ProfilePhotoDialog({ open, name, currentUrl, onClose }: ProfileP
 
     setProcessing(true);
     const blob = await renderAvatar(edit.image, edit.crop, edit.adjustments);
+
+    // Cancelado enquanto a foto era preparada: não envia.
+    if (!mounted.current) {
+      return;
+    }
+
     setProcessing(false);
 
     if (blob === null) {
@@ -112,6 +118,34 @@ export function ProfilePhotoDialog({ open, name, currentUrl, onClose }: ProfileP
   };
 
   const chooseFile = () => inputRef.current?.click();
+
+  // Soltar a imagem em qualquer lugar (fora da área tracejada, sobre o editor, no fundo)
+  // troca a foto. Sem isto o navegador abriria a imagem no lugar do app e a edição se
+  // perderia.
+  const dropFile = useEffectEvent((event: DragEvent) => {
+    event.preventDefault();
+    setDragging(false);
+
+    if (!busy) {
+      void handleFile(event.dataTransfer?.files[0]);
+    }
+  });
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const allowDrop = (event: DragEvent) => event.preventDefault();
+    const onDrop = (event: DragEvent) => dropFile(event);
+    window.addEventListener("dragover", allowDrop);
+    window.addEventListener("drop", onDrop);
+
+    return () => {
+      window.removeEventListener("dragover", allowDrop);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [open]);
 
   return (
     <Dialog open={open} onClose={close} label="Foto de perfil">
@@ -141,11 +175,6 @@ export function ProfilePhotoDialog({ open, name, currentUrl, onClose }: ProfileP
             if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) {
               setDragging(false);
             }
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragging(false);
-            void handleFile(event.dataTransfer.files[0]);
           }}
           data-dragging={dragging}
           className="mt-6 flex flex-col items-center gap-4 rounded-3xl border border-dashed border-line px-6 py-8 text-center transition data-[dragging=true]:border-ink/40 data-[dragging=true]:bg-ink/5"

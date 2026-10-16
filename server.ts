@@ -147,7 +147,9 @@ function withForwardedProto(request: Request, forwardedProto: string | undefined
 // está logado para /login: o cartão saía só com o domínio. Para eles, o login é servido
 // direto (200) no endereço pedido, com as tags de compartilhamento do layout.
 function isLoginRedirect(response: Response): boolean {
-  return response.status >= 300 && response.status < 400 && response.headers.get("location") === "/login";
+  const location = response.headers.get("location") ?? "";
+
+  return response.status >= 300 && response.status < 400 && (location === "/login" || location.startsWith("/login?"));
 }
 
 app.all("*", async (c) => {

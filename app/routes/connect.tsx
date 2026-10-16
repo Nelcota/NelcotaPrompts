@@ -49,7 +49,7 @@ const HANDLERS: Record<"createToken" | "revokeToken", IntentHandler<PublicUser, 
 };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireUser(request);
+  const user = await requireUser(request, { returnHere: true });
 
   return { user, tokens: await listApiTokens(user.id), origin: appOrigin(request) };
 }

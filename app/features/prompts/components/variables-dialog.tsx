@@ -52,9 +52,18 @@ export function VariablesDialog({ target, onClose, onCopied }: VariablesDialogPr
     }
 
     setCopied(true);
-    // Só o que a pessoa escolheu: o padrão deste prompt não vira "último valor" e não
-    // passa por cima do padrão de outro prompt com a mesma variável.
-    rememberValues(Object.fromEntries(target.specs.filter((spec) => ownValue(values, spec.name) !== spec.defaultValue).map((spec) => [spec.name, ownValue(values, spec.name) ?? ""])));
+    // Só o que a pessoa escolheu vira "último valor". O padrão deste prompt (ou o campo
+    // vazio) não vira, para não passar por cima do padrão de outro prompt com a mesma
+    // variável; e esquece o valor antigo, que senão voltaria na próxima cópia.
+    rememberValues(
+      Object.fromEntries(
+        target.specs.map((spec) => {
+          const value = ownValue(values, spec.name) ?? "";
+
+          return [spec.name, value === spec.defaultValue ? "" : value];
+        }),
+      ),
+    );
     onCopied(target.prompt);
     closeTimer.current = window.setTimeout(onClose, 700);
   };

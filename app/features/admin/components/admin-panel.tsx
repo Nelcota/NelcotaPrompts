@@ -40,7 +40,7 @@ function TabContent({ data, adminId }: { data: AdminTabData; adminId: string }) 
     case "usuarios":
       return <UsersTab users={data.users} adminId={adminId} />;
     case "prompts":
-      return <PromptsTab prompts={data.prompts} trash={data.trash} search={data.search} />;
+      return <PromptsTab prompts={data.prompts} trash={data.trash} trashTotal={data.trashTotal} search={data.search} />;
     case "convite":
       return <InviteTab invite={data.invite} required={data.inviteRequired} />;
     case "marca":

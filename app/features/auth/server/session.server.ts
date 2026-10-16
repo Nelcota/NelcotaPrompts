@@ -5,6 +5,7 @@ import { getDb } from "~/shared/server/db.server";
 import { sessions } from "~/shared/server/db/schema";
 import { readEnv } from "~/shared/server/env.server";
 import { isUuid } from "~/shared/lib/ids";
+import { loginHref } from "../login-redirect";
 import { deleteUserSessions } from "./session-store.server";
 import { findUserById, type PublicUser } from "./users.server";
 
@@ -119,18 +120,34 @@ export async function getOptionalUser(request: Request): Promise<PublicUser | nu
   return findUserById(userId);
 }
 
-export async function requireUser(request: Request): Promise<PublicUser> {
+type RequireOptions = {
+  // Página (não rota de dados): o login volta para ela (ex.: um link /?p=… compartilhado).
+  // Rotas que só devolvem JSON não usam, ou a pessoa cairia no JSON depois de entrar.
+  returnHere?: boolean;
+};
+
+function loginUrl(request: Request, { returnHere = false }: RequireOptions): string {
+  if (!returnHere) {
+    return "/login";
+  }
+
+  const url = new URL(request.url);
+
+  return loginHref(`${url.pathname}${url.search}`);
+}
+
+export async function requireUser(request: Request, options: RequireOptions = {}): Promise<PublicUser> {
   const session = await getSession(request);
   const userId = session.get("userId");
 
   if (userId === undefined) {
-    throw redirect("/login");
+    throw redirect(loginUrl(request, options));
   }
 
   const user = await findUserById(userId);
 
   if (user === null) {
-    throw redirect("/login", {
+    throw redirect(loginUrl(request, options), {
       headers: { "Set-Cookie": await destroySession(session) },
     });
   }
@@ -139,8 +156,8 @@ export async function requireUser(request: Request): Promise<PublicUser> {
 }
 
 // Quem não é admin recebe 404: a rota nem parece existir.
-export async function requireAdmin(request: Request): Promise<PublicUser> {
-  const user = await requireUser(request);
+export async function requireAdmin(request: Request, options: RequireOptions = {}): Promise<PublicUser> {
+  const user = await requireUser(request, options);
 
   if (!user.isAdmin) {
     throw new Response("Página não encontrada.", { status: 404 });

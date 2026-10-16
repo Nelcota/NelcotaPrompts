@@ -10,6 +10,7 @@ import { Avatar } from "~/shared/ui/avatar";
 import { cn } from "~/shared/ui/cn";
 import { buttonClass } from "~/shared/ui/styles";
 import { type ClientGuide, type ClientId, clientGuides, mcpUrl } from "../clients";
+import { AppLogo } from "./app-logos";
 import { ConnectedApps } from "./connected-apps";
 import { ManualToken } from "./manual-token";
 
@@ -92,10 +93,11 @@ export function ConnectPage({ user, tokens, origin }: { user: SessionUser; token
                 aria-selected={candidate.id === selected}
                 onClick={() => setSelected(candidate.id)}
                 className={cn(
-                  "rounded-full border px-4 py-2 text-sm font-medium transition",
+                  "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
                   candidate.id === selected ? "border-ink bg-ink text-canvas" : "border-line text-muted hover:bg-ink/5 hover:text-ink",
                 )}
               >
+                <AppLogo id={candidate.id} className="size-4 shrink-0" />
                 {candidate.label}
               </button>
             ))}

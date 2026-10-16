@@ -63,3 +63,10 @@ export const labelClass = "text-sm font-medium tracking-wide text-muted uppercas
 
 // Destaque das {variáveis} no texto e nos chips.
 export const variableMarkClass = "rounded bg-amber-300/25 px-0.5 text-ink";
+
+// Menus suspensos (Radix DropdownMenu): caixa, item e ícone. A largura fica com quem usa.
+export const menuContentClass =
+  "menu-pop z-50 origin-(--radix-dropdown-menu-content-transform-origin) rounded-2xl border border-line bg-elevated p-1.5 text-ink shadow-2xl shadow-black/40";
+export const menuItemClass =
+  "flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] text-ink outline-none transition select-none data-[highlighted]:bg-ink/8";
+export const menuIconClass = "size-4 shrink-0 text-muted";

@@ -142,7 +142,7 @@ The app is also an [MCP](https://modelcontextprotocol.io) server at `/mcp` (Stre
 
 No token to copy: the app registers itself (OAuth dynamic client registration), opens the browser, you sign in and choose **Everything** or **Read only**. Under the hood it is OAuth 2.1 with PKCE (S256); the issued token (`nlc_…`) is stored hashed and listed under **Connected**, where you can disconnect it. Apps that can't sign in through the browser can use a token created by hand (**Advanced**) in the `Authorization: Bearer` header.
 
-Four tools keep it simple for the model: `search_prompts` (also returns the tags in use), `get_prompt` (optionally fills `{variables}`), and, with full access, `save_prompt` (create, or edit only the fields sent) and `delete_prompt` (`undo: true` restores). The 200 most recent prompts are also MCP *prompts* with their variables as arguments, so in Claude Code they become slash commands such as `/mcp__nelcota__code-review-de-pr-31c2175f`.
+Four tools keep it simple for the model: `search_prompts` (without filters it also lists the tags in use), `get_prompt` (optionally fills `{variables}`), and, with full access, `save_prompt` (create, or edit only the fields sent) and `delete_prompt` (`undo: true` restores). The 200 most recent prompts are also MCP *prompts* with their variables as arguments, so in Claude Code they become slash commands such as `/mcp__nelcota__code-review-de-pr-31c2175f`.
 
 **Pulling a prompt into a project from the site:** an open prompt has a **Use in another project** button: download it as a Claude Code command (`.claude/commands/<name>.md`, variables become `$1`, `$2`…), download the raw `.md`, or copy a ready-made request for the connected AI.
 

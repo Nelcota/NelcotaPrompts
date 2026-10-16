@@ -173,6 +173,8 @@ export const oauthClients = pgTable("oauth_clients", {
   id: text().primaryKey(),
   name: text().notNull(),
   redirectUris: text("redirect_uris").array().notNull(),
+  // Primeira autorização concluída; null = nunca usado (é limpo depois de um tempo).
+  authorizedAt: timestamp("authorized_at", { withTimezone: true }),
   ...timestamps,
 });
 

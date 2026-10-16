@@ -1,20 +1,22 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, eq, gt, lt, notExists, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 
 import type { TokenAccess } from "~/features/api-tokens/api-token-rules";
 import { issueClientToken } from "~/features/api-tokens/server/api-tokens.server";
 import { publicUrl } from "~/shared/lib/public-url";
 import { getDb } from "~/shared/server/db.server";
-import { apiTokens, oauthClients, oauthCodes } from "~/shared/server/db/schema";
+import { oauthClients, oauthCodes } from "~/shared/server/db/schema";
+import { hashSecret } from "~/shared/server/secret-hash.server";
 
 // OAuth 2.1 mínimo para o servidor MCP: registro dinâmico de cliente, autorização com
 // PKCE (S256) e troca do código por um token de API. O cliente de IA faz tudo sozinho; a
 // pessoa só entra e clica em "Permitir".
 
 const CODE_TTL = sql`interval '10 minutes'`;
-// Cliente registrado que nunca chegou a receber token é apagado depois deste prazo.
-const UNUSED_CLIENT_TTL = sql`interval '1 day'`;
+// Cliente registrado que nunca foi autorizado é apagado depois deste prazo. O que já foi
+// autorizado uma vez fica: o app reaproveita o client_id ao reconectar.
+const UNUSED_CLIENT_TTL = sql`interval '7 days'`;
 const CLIENT_NAME_MAX = 80;
 const REDIRECT_URIS_MAX = 10;
 const VERIFIER_PATTERN = /^[A-Za-z0-9._~-]{43,128}$/;
@@ -24,14 +26,6 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const BLOCKED_SCHEMES = new Set(["javascript:", "data:", "file:", "blob:", "vbscript:", "about:"]);
 
 export const SCOPES = { read: "prompts:read", write: "prompts:write" } as const;
-
-function sha256(value: string): Buffer {
-  return createHash("sha256").update(value).digest();
-}
-
-function hashCode(code: string): string {
-  return sha256(code).toString("hex");
-}
 
 // Endereço do app: APP_URL manda (atrás do proxy é o que o cliente enxerga); sem ela, o da
 // própria requisição.
@@ -106,16 +100,9 @@ export async function registerClient(input: RegisterInput): Promise<RegisterResu
   const clientId = randomBytes(18).toString("base64url");
   const db = getDb();
 
-  // Aproveita para limpar códigos vencidos e clientes que nunca foram usados.
+  // Aproveita para limpar códigos vencidos e clientes que nunca foram autorizados.
   await db.delete(oauthCodes).where(lt(oauthCodes.expiresAt, sql`now()`));
-  await db
-    .delete(oauthClients)
-    .where(
-      and(
-        lt(oauthClients.createdAt, sql`now() - ${UNUSED_CLIENT_TTL}`),
-        notExists(db.select({ id: apiTokens.id }).from(apiTokens).where(eq(apiTokens.clientId, oauthClients.id))),
-      ),
-    );
+  await db.delete(oauthClients).where(and(isNull(oauthClients.authorizedAt), lt(oauthClients.createdAt, sql`now() - ${UNUSED_CLIENT_TTL}`)));
   await db.insert(oauthClients).values({ id: clientId, name, redirectUris: uris });
 
   return { ok: true, clientId, name, redirectUris: uris };
@@ -202,7 +189,7 @@ export async function createAuthorizationCode(request: AuthorizeRequest, userId:
   await getDb()
     .insert(oauthCodes)
     .values({
-      codeHash: hashCode(code),
+      codeHash: hashSecret(code),
       clientId: request.clientId,
       userId,
       redirectUri: request.redirectUri,
@@ -215,7 +202,7 @@ export async function createAuthorizationCode(request: AuthorizeRequest, userId:
 }
 
 export function pkceMatches(verifier: string, challenge: string): boolean {
-  return VERIFIER_PATTERN.test(verifier) && sha256(verifier).toString("base64url") === challenge;
+  return VERIFIER_PATTERN.test(verifier) && createHash("sha256").update(verifier).digest("base64url") === challenge;
 }
 
 type ExchangeInput = { code: string; clientId: string; redirectUri: string | null; codeVerifier: string };
@@ -226,7 +213,7 @@ type ExchangeResult = { ok: true; token: string; access: TokenAccess } | { ok: f
 export async function exchangeCode(input: ExchangeInput): Promise<ExchangeResult> {
   const [row] = await getDb()
     .delete(oauthCodes)
-    .where(and(eq(oauthCodes.codeHash, hashCode(input.code)), gt(oauthCodes.expiresAt, sql`now()`)))
+    .where(and(eq(oauthCodes.codeHash, hashSecret(input.code)), gt(oauthCodes.expiresAt, sql`now()`)))
     .returning({
       clientId: oauthCodes.clientId,
       userId: oauthCodes.userId,
@@ -252,5 +239,11 @@ export async function exchangeCode(input: ExchangeInput): Promise<ExchangeResult
 
   const token = await issueClientToken(row.userId, client.id, client.name, row.access);
 
-  return token === null ? { ok: false } : { ok: true, token, access: row.access };
+  if (token === null) {
+    return { ok: false };
+  }
+
+  await getDb().update(oauthClients).set({ authorizedAt: sql`now()` }).where(and(eq(oauthClients.id, client.id), isNull(oauthClients.authorizedAt)));
+
+  return { ok: true, token, access: row.access };
 }

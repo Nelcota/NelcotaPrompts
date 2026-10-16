@@ -1,4 +1,4 @@
-import { corsJson, corsPreflight } from "~/features/oauth/server/cors.server";
+import { corsJson, postOnlyLoader } from "~/features/oauth/server/cors.server";
 import { registerClient } from "~/features/oauth/server/oauth.server";
 import { getClientIp } from "~/shared/server/client-ip.server";
 import { consumeAttempt, retryAfterHeaders } from "~/shared/server/rate-limit.server";
@@ -9,15 +9,11 @@ import type { Route } from "./+types/oauth-register";
 const REGISTRATIONS_PER_HOUR = 20;
 const HOUR_MS = 60 * 60 * 1000;
 
+export function loader({ request }: Route.LoaderArgs) {
+  return postOnlyLoader(request);
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
-  if (request.method === "OPTIONS") {
-    return corsPreflight();
-  }
-
-  if (request.method !== "POST") {
-    return corsJson({ error: "invalid_request" }, 405);
-  }
-
   const limit = await consumeAttempt(`oauth-register:${getClientIp(request, context)}`, REGISTRATIONS_PER_HOUR, HOUR_MS);
 
   if (limit.limited) {

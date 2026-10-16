@@ -1,4 +1,4 @@
-import { corsJson, corsPreflight } from "~/features/oauth/server/cors.server";
+import { corsJson, postOnlyLoader } from "~/features/oauth/server/cors.server";
 import { exchangeCode, SCOPES } from "~/features/oauth/server/oauth.server";
 import { getClientIp } from "~/shared/server/client-ip.server";
 import { consumeAttempt, retryAfterHeaders } from "~/shared/server/rate-limit.server";
@@ -11,11 +11,11 @@ const WINDOW_MS = 15 * 60 * 1000;
 
 const invalidGrant = () => corsJson({ error: "invalid_grant", error_description: "Código inválido, vencido ou já usado." }, 400);
 
-export async function action({ request, context }: Route.ActionArgs) {
-  if (request.method === "OPTIONS") {
-    return corsPreflight();
-  }
+export function loader({ request }: Route.LoaderArgs) {
+  return postOnlyLoader(request);
+}
 
+export async function action({ request, context }: Route.ActionArgs) {
   const limit = await consumeAttempt(`oauth-token:${getClientIp(request, context)}`, ATTEMPTS_PER_WINDOW, WINDOW_MS);
 
   if (limit.limited) {

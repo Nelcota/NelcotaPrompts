@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 
 import { authenticateApiToken, readBearerToken } from "~/features/api-tokens/server/api-tokens.server";
 import { createMcpServer } from "~/features/mcp/server/mcp.server";
+import { corsPreflight, withCors } from "~/features/oauth/server/cors.server";
 import { appOrigin } from "~/features/oauth/server/oauth.server";
 import { consumeAttempt, retryAfterHeaders } from "~/shared/server/rate-limit.server";
 import type { Route } from "./+types/mcp";
@@ -50,10 +51,10 @@ async function handle(request: Request): Promise<Response> {
 
 // Sem sessão não há stream de eventos do servidor para abrir: GET responde 405, como a
 // especificação prevê (o cliente segue só com POST).
-export function loader() {
-  return new Response(null, { status: 405, headers: { Allow: "POST" } });
+export function loader({ request }: Route.LoaderArgs) {
+  return request.method === "OPTIONS" ? corsPreflight() : withCors(new Response(null, { status: 405, headers: { Allow: "POST" } }));
 }
 
-export function action({ request }: Route.ActionArgs) {
-  return handle(request);
+export async function action({ request }: Route.ActionArgs) {
+  return withCors(await handle(request));
 }

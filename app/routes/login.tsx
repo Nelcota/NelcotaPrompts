@@ -6,7 +6,7 @@ import { clearAttempts, consumeAttempt, releaseAttempt, retryAfterHeaders, tooMa
 import { loginSchema } from "~/features/auth/account-rules";
 import { createUserSession, getOptionalUser } from "~/features/auth/server/session.server";
 import { isInviteRequired } from "~/features/auth/server/invite.server";
-import { readRedirectParam, REDIRECT_FIELD, safeRedirectPath } from "~/features/auth/login-redirect";
+import { readRedirectParam, REDIRECT_FIELD, safeRedirectPath, withRedirect } from "~/features/auth/login-redirect";
 import { verifyLogin } from "~/features/auth/server/users.server";
 import { parseForm, readForm, readText, UNREADABLE_FORM } from "~/shared/server/validation.server";
 import type { Route } from "./+types/login";
@@ -100,7 +100,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
     <AuthShell
       title="Entrar"
       subtitle="Acesse a biblioteca de prompts."
-      footer={{ text: loaderData.inviteRequired ? "Recebeu um convite?" : "Não tem conta?", linkLabel: "Criar conta", to: "/cadastro" }}
+      footer={{ text: loaderData.inviteRequired ? "Recebeu um convite?" : "Não tem conta?", linkLabel: "Criar conta", to: withRedirect("/cadastro", loaderData.redirectTo) }}
     >
       <Form method="post" className="space-y-4">
         <FormError message={actionData?.error} />

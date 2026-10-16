@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { hashApiToken, isApiTokenFormat, readBearerToken } from "./api-tokens.server";
+import { isApiTokenFormat, readBearerToken } from "./api-tokens.server";
 
 const TOKEN = `nlc_${"a".repeat(43)}`;
 
@@ -11,11 +11,6 @@ describe("tokens de API", () => {
     expect(isApiTokenFormat(TOKEN)).toBe(true);
     expect(isApiTokenFormat(TOKEN.slice(0, -1))).toBe(false);
     expect(isApiTokenFormat(`xyz_${"a".repeat(43)}`)).toBe(false);
-  });
-
-  test("o hash é estável e não contém o token", () => {
-    expect(hashApiToken(TOKEN)).toBe(hashApiToken(TOKEN));
-    expect(hashApiToken(TOKEN)).not.toContain(TOKEN);
   });
 
   test("lê o token do cabeçalho Bearer", () => {

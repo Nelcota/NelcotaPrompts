@@ -7,6 +7,7 @@ import type { SessionUser } from "~/features/auth/types";
 import { type HomeQuery, shortcutHref } from "~/features/prompts/list-query";
 import { Avatar } from "~/shared/ui/avatar";
 import { cn } from "~/shared/ui/cn";
+import { menuContentClass, menuIconClass, menuItemClass } from "~/shared/ui/styles";
 
 type UserMenuProps = {
   user: SessionUser;
@@ -15,9 +16,8 @@ type UserMenuProps = {
   onEditAccount: () => void;
 };
 
-const menuItem =
-  "flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] text-ink outline-none transition select-none data-[highlighted]:bg-ink/8";
-const menuIcon = "size-4 shrink-0 text-muted";
+const menuItem = menuItemClass;
+const menuIcon = menuIconClass;
 const separator = "my-1.5 h-px bg-line";
 
 // Menu da conta (Radix DropdownMenu): setas, letra inicial, Esc devolvendo o foco ao
@@ -46,7 +46,7 @@ export function UserMenu({ user, query, onEditPhoto, onEditAccount }: UserMenuPr
               setOpen(false);
             }
           }}
-          className="menu-pop z-50 w-64 origin-(--radix-dropdown-menu-content-transform-origin) rounded-2xl border border-line bg-elevated p-1.5 text-ink shadow-2xl shadow-black/40"
+          className={cn(menuContentClass, "w-64")}
         >
           <div className="flex items-center gap-3 px-3 pt-2.5 pb-3">
             <Avatar name={user.name} url={user.avatarUrl} sizeClassName="size-10" fallbackClassName="bg-ink/10 text-sm text-ink" />

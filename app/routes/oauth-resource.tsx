@@ -5,9 +5,9 @@ import type { Route } from "./+types/oauth-resource";
 // /.well-known/oauth-protected-resource (RFC 9728): diz ao app de IA que o /mcp é
 // protegido e quem emite os tokens (este mesmo site).
 export function loader({ request }: Route.LoaderArgs) {
-  return corsJson(protectedResourceMetadata(appOrigin(request)));
-}
+  if (request.method === "OPTIONS") {
+    return corsPreflight();
+  }
 
-export function action() {
-  return corsPreflight();
+  return corsJson(protectedResourceMetadata(appOrigin(request)));
 }

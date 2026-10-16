@@ -6,11 +6,12 @@ import { aiPullRequest, promptFileName, toClaudeCommand } from "~/features/promp
 import type { Prompt } from "~/features/prompts/types";
 import { copyText } from "~/shared/lib/copy-text";
 import { downloadText } from "~/shared/lib/download-text";
-import { iconButtonClass } from "~/shared/ui/styles";
+import { cn } from "~/shared/ui/cn";
+import { iconButtonClass, menuContentClass, menuIconClass, menuItemClass } from "~/shared/ui/styles";
 
-const menuItem =
-  "flex w-full cursor-pointer items-start gap-2.5 rounded-xl px-3 py-2 text-left text-[15px] text-ink outline-none transition select-none data-[highlighted]:bg-ink/8";
-const menuIcon = "mt-0.5 size-4 shrink-0 text-muted";
+// Itens com uma linha de explicação: o ícone alinha com a primeira linha.
+const menuItem = cn(menuItemClass, "items-start");
+const menuIcon = cn(menuIconClass, "mt-0.5");
 const menuHint = "block text-xs text-muted";
 
 // Levar o prompt para outro projeto: comando do Claude Code, arquivo .md ou um pedido
@@ -26,7 +27,7 @@ export function UseInProjectMenu({ prompt, body, iconClassName }: { prompt: Prom
       <DropdownMenu.Content
         align="start"
         sideOffset={8}
-        className="menu-pop z-50 w-72 origin-(--radix-dropdown-menu-content-transform-origin) rounded-2xl border border-line bg-elevated p-1.5 text-ink shadow-2xl shadow-black/40"
+        className={cn(menuContentClass, "w-72")}
       >
         <DropdownMenu.Item
           className={menuItem}

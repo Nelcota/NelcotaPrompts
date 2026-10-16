@@ -8,6 +8,7 @@ import { countCopy } from "~/features/prompts/server/prompt-actions.server";
 import {
   createPrompt,
   getPromptBody,
+  findPromptsByIdPrefix,
   getPromptById,
   listPromptIndex,
   listPrompts,
@@ -90,14 +91,14 @@ const id = z.string().uuid().describe("Id do prompt (uuid).");
 const TAGS_SHOWN = 30;
 
 function registerReadTools(server: McpServer, caller: ApiCaller) {
-  const viewerId = caller.user.id;
+  const viewerId = caller.userId;
 
   server.registerTool(
     "search_prompts",
     {
       title: "Buscar prompts",
       description:
-        "Busca no mural (sem acento, tolera erro de digitação). Sem query, lista os mais recentes. Devolve um trecho de cada prompt e as tags em uso; use get_prompt para o texto inteiro.",
+        "Busca no mural (sem acento, tolera erro de digitação). Sem filtros, lista os mais recentes e as tags em uso. Devolve um trecho de cada prompt; use get_prompt para o texto inteiro.",
       inputSchema: {
         query: z.string().max(SEARCH_MAX).optional().describe("Texto a buscar no título, tags e corpo."),
         tag: z.string().optional().describe("Só prompts com esta tag."),
@@ -111,22 +112,19 @@ function registerReadTools(server: McpServer, caller: ApiCaller) {
     async (args) => {
       const search = args.query?.trim() ?? "";
       const tag = args.tag?.trim().toLowerCase().replace(/^#/, "") ?? "";
-      const [{ prompts, total }, tags] = await Promise.all([
-        listPrompts(
-          viewerId,
-          {
-            search: search === "" ? null : search,
-            tag: tag === "" ? null : tag,
-            authorId: args.mine === true ? viewerId : null,
-            favoritesOnly: args.favorites === true,
-            sort: args.popular === true ? "popular" : "recent",
-          },
-          args.limit ?? 20,
-        ),
-        listTags(),
-      ]);
+      const filters = {
+        search: search === "" ? null : search,
+        tag: tag === "" ? null : tag,
+        authorId: args.mine === true ? viewerId : null,
+        favoritesOnly: args.favorites === true,
+        sort: args.popular === true ? ("popular" as const) : ("recent" as const),
+      };
+      // As tags (varrem o mural todo) vão só na primeira olhada, sem filtro: é quando a IA
+      // ainda não sabe como o mural se organiza.
+      const exploring = filters.search === null && filters.tag === null && filters.authorId === null && !filters.favoritesOnly;
+      const [{ prompts, total }, tags] = await Promise.all([listPrompts(viewerId, filters, args.limit ?? 20), exploring ? listTags() : null]);
 
-      return ok({ total, prompts: prompts.map(summary), tags: tags.slice(0, TAGS_SHOWN).map((entry) => entry.tag) });
+      return ok({ total, prompts: prompts.map(summary), ...(tags === null ? {} : { tags: tags.slice(0, TAGS_SHOWN).map((entry) => entry.tag) }) });
     },
   );
 
@@ -149,8 +147,8 @@ function registerReadTools(server: McpServer, caller: ApiCaller) {
         return fail(OWNERSHIP_ERRORS.not_found);
       }
 
-      await countCopy(viewerId, args.id);
-
+      // Ler não conta como cópia: a IA lê vários para comparar ou antes de editar, e isso
+      // inflaria o "Mais copiados". Conta o uso de fato (o comando de barra, em prompts/get).
       const { excerpt: _excerpt, ...meta } = summary(prompt);
 
       return ok({
@@ -163,7 +161,7 @@ function registerReadTools(server: McpServer, caller: ApiCaller) {
 }
 
 function registerWriteTools(server: McpServer, caller: ApiCaller) {
-  const userId = caller.user.id;
+  const userId = caller.userId;
 
   server.registerTool(
     "save_prompt",
@@ -253,15 +251,19 @@ function registerLibraryPrompts(server: McpServer, caller: ApiCaller) {
     };
   });
 
+  // O nome termina no começo do id: busca direto por ele (vale também para prompts que já
+  // saíram dos 200 mais recentes da lista, se o cliente guardou o nome).
   server.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-    const index = await listPromptIndex(PROMPT_INDEX_MAX);
-    const prompt = index.find((candidate) => mcpPromptName(candidate) === request.params.name);
+    const prefix = request.params.name.slice(-8);
+    const candidates = await findPromptsByIdPrefix(prefix);
+    // Título trocado depois que o cliente guardou o nome: vale o id, se só um bate.
+    const prompt = candidates.find((candidate) => mcpPromptName(candidate) === request.params.name) ?? (candidates.length === 1 ? candidates[0] : undefined);
 
     if (prompt === undefined) {
       throw new McpError(ErrorCode.InvalidParams, `Prompt não encontrado: ${request.params.name}`);
     }
 
-    await countCopy(caller.user.id, prompt.id);
+    await countCopy(caller.userId, prompt.id);
 
     return {
       description: prompt.title,

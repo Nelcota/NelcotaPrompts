@@ -8,6 +8,10 @@ create table if not exists oauth_clients (
   id text primary key,
   name text not null,
   redirect_uris text[] not null,
+  -- Primeira autorização concluída. Cliente que nunca chegou a ser autorizado é apagado
+  -- depois de um tempo; o que já foi usado fica (o app guarda o client_id e o reaproveita
+  -- ao reconectar, mesmo depois de a pessoa desconectar).
+  authorized_at timestamptz,
   created_at timestamptz not null default now()
 );
 
